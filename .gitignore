@@ -1,0 +1,7 @@
+build/*
+combined_fasta/*
+notebooks/*
+*.log
+vcat/__pycache__/*
+.snakemake
+*snakemake*

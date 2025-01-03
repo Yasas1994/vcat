@@ -1,0 +1,26 @@
+name: vcat  # Name of your Conda environment
+channels:
+  - conda-forge       
+  - bioconda                    
+dependencies:
+  - python=3.11        
+  - aria2
+  - csvtk
+  - taxopy
+  - rapidfuzz
+  - taxonkit=0.18.0
+  - mmseqs2=15.6f452
+  - snakemake
+  - seaborn
+  - pyfastx       
+  - click
+  - dask
+  - tqdm
+  - biopython
+  - ete3
+  - openpyxl            
+  - pyyaml            
+  - pandas             
+  - numpy              
+  - matplotlib         
+  - pip                
