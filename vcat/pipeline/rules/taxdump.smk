@@ -16,10 +16,12 @@ rule download_file:
     output:
         f"{DBDIR}/ictv.xlsx"
     params:
-        url = config['ictv_url']
+        url = config['ictv_url'],
+	outdir = DBDIR,
+	outfile = "ictv.xlsx"
     shell:
         """
-        aria2c -x 4 {params.url} -o {output}
+        aria2c -x 4 {params.url}  --dir {params.outdir}  -o {params.outfile}
         """
 
 # Convert XLSX to TSV
