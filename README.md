@@ -1,4 +1,5 @@
 # vcat
+
 The Virus Contig Annotation Tool (vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for viral contigs.
 
 #### Database Generation Pipeline

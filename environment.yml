@@ -6,10 +6,11 @@ dependencies:
   - python=3.11        
   - aria2
   - csvtk
+  - seqkit
   - taxopy
   - rapidfuzz
   - taxonkit=0.18.0
-  - mmseqs2=15.6f452
+  - mmseqs2=17.b804f # upgraded from 15.6f452 
   - snakemake
   - seaborn
   - pyfastx       
@@ -22,5 +23,7 @@ dependencies:
   - pyyaml            
   - pandas             
   - numpy              
-  - matplotlib         
-  - pip                
+  - matplotlib 
+  - polars        
+  - pip    
+            

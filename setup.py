@@ -29,7 +29,7 @@ setup(
     package_data={
         "vcat":["pipeline/*", "pipeline/rules/*"],
     },
-    data_files=[(".", ["README.md", "LICENSE.txt", "MANIFEST.in"])],
+    data_files=[(".", ["README.md", "LICENSE", "MANIFEST.in"])],
     install_requires=[],
     # install via conda: click, pandas, pyyaml, snakemake
     entry_points={"console_scripts": ["vcat = vcat.cli:cli"]},
