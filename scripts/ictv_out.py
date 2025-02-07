@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import taxopy
 import pyfastx
-from sys import argv, stderr
+from sys import argv
 
 DATABASE_DIR = argv[1]
 INFILE = argv[2]
