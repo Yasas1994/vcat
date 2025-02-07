@@ -1,5 +1,6 @@
 from pathlib import Path
 import multiprocessing
+import subprocess
 import os
 
 # Load the configuration file
@@ -15,6 +16,16 @@ PROTDB = f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins"
 GENOMEDB = f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes"
 PROFDB = f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles"
 INDIR = os.path.dirname(INFILES)
+
+f = subprocess.run(["seqkit", "stats", INFILES], capture_output=True, text=True)
+
+file_stats = dict(zip(f.stdout.split("\n")[0].split(),
+f.stdout.split("\n")[1].split()))
+
+if int(file_stats["num_seqs"]) <= workflow.cores:
+    PRODIGAL_SPLITS = int(file_stats["num_seqs"])
+else:
+    PRODIGAL_SPLITS = workflow.cores
 
 # Function to dynamically generate output files
 def generate_outputs(wildcards):
@@ -34,7 +45,7 @@ rule all:
         expand(f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome.m8",
         sample=[os.path.splitext(os.path.basename(INFILES))[0]],
         ext=[os.path.basename(INFILES).split(".")[-1]]),
-        expand(f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot_lca.tsv",
+        expand(f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot.m8",
         sample=[os.path.splitext(os.path.basename(INFILES))[0]],
         ext=[os.path.basename(INFILES).split(".")[-1]]),
         expand(f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof.m8",
@@ -43,9 +54,16 @@ rule all:
         expand(f"{OUTDIR}/results/{{sample}}_{{ext}}.csv",
         sample=[os.path.splitext(os.path.basename(INFILES))[0]],
         ext=[os.path.basename(INFILES).split(".")[-1]]),
+        expand(f"{OUTDIR}/prot/{{sample}}_{{ext}}.gff",
+        sample=[os.path.splitext(os.path.basename(INFILES))[0]],
+        ext=[os.path.basename(INFILES).split(".")[-1]]),
         expand(f"{OUTDIR}/results/{{sample}}_{{ext}}_formatted_results.csv",
         sample=[os.path.splitext(os.path.basename(INFILES))[0]],
-        ext=[os.path.basename(INFILES).split(".")[-1]])
+        ext=[os.path.basename(INFILES).split(".")[-1]]),
+        expand(f"{OUTDIR}/tmp/{{sample}}_{{part}}_{{ext}}.gff",
+        sample=[os.path.splitext(os.path.basename(INFILES))[0]],
+        ext=[os.path.basename(INFILES).split(".")[-1]],
+        part=[str(i).zfill(3) for i in range(1, PRODIGAL_SPLITS)]),
         
 
 
@@ -59,36 +77,97 @@ rule annot_nuc:
         f"{OUTDIR}/logs/{{sample}}_{{ext}}_annot_nuc.log"
     params:
         db=GENOMEDB,
-         tmp=temp(f"{OUTDIR}/tmp"),
+        tmp=temp(f"{OUTDIR}/tmp"),
     threads: int(workflow.cores * 0.75)
     shell:
         """
-        mmseqs easy-search {input} {params.db} {output.out} {params.tmp} --search-type 3 \
-        --format-output query,target,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage >> {log}
+        mmseqs easy-search {input} {params.db} {output.out} {params.tmp} --threads {threads} -s 7 --search-type 3\
+        --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
+        """
+
+rule split_fasta:
+    input:
+        f"{INDIR}/{{sample}}.{{ext}}"
+    output:
+        ["{OUTDIR}/tmp/{{sample}}.part_{i}.{{ext}}".format(OUTDIR=OUTDIR, i=str(i).zfill(3)) for i in range(1, PRODIGAL_SPLITS)]
+    log:
+        f"{OUTDIR}/logs/{{sample}}_{{ext}}_run_prodigal.log"
+    params:
+        out=f"{OUTDIR}/tmp",
+        splits=PRODIGAL_SPLITS,
+
+    threads: 4
+        
+    shell:
+        """
+        seqkit split2 --by-part {params.splits} --threads {threads} {input} -O {params.out} &> {log}
+        """    
+
+# predict proteins
+# to do: run multiple instances of prodigal-gv parallaly
+rule run_prodigal:
+    input:
+        temp(f"{OUTDIR}/tmp/{{sample}}.part_{{part}}.{{ext}}")
+    output:
+        fasta=f"{OUTDIR}/tmp/{{sample}}_{{part}}_{{ext}}.faa",
+        gff=f"{OUTDIR}/tmp/{{sample}}_{{part}}_{{ext}}.gff",
+    log:
+        f"{OUTDIR}/logs/{{sample}}_{{part}}_{{ext}}_run_prodigal.log"
+
+    threads: 1
+    shell:
+        """
+        prodigal-gv -i {input} -a {output.fasta} -o {output.gff} -p meta -f gff &> {log}
+        """
+
+rule merge_prodigal:
+    input:
+        faa=expand(f"{OUTDIR}/tmp/{{sample}}_{{part}}_{{ext}}.faa",
+            sample=[os.path.splitext(os.path.basename(INFILES))[0]],
+            ext=[os.path.basename(INFILES).split(".")[-1]],
+            part=[str(i).zfill(3) for i in range(1, PRODIGAL_SPLITS)]),
+
+        gff=expand(f"{OUTDIR}/tmp/{{sample}}_{{part}}_{{ext}}.gff",
+            sample=[os.path.splitext(os.path.basename(INFILES))[0]],
+            ext=[os.path.basename(INFILES).split(".")[-1]],
+            part=[str(i).zfill(3) for i in range(1, PRODIGAL_SPLITS)]),
+    output:
+        faa=f"{OUTDIR}/prot/{{sample}}_{{ext}}.faa",
+        gff=f"{OUTDIR}/prot/{{sample}}_{{ext}}.gff",
+    log:
+        f"{OUTDIR}/logs/{{sample}}_{{ext}}_merge_prodigal.log"
+
+    threads: 1
+    shell:
+        """
+        cat {input.gff} 1> {output.gff} 2>> {log}
+        cat {input.faa} 1> {output.faa} 2>> {log}
         """
 
 # Protein level annotations
 rule annot_prot:
     input:
-        f"{INDIR}/{{sample}}.{{ext}}"
+        f"{OUTDIR}/prot/{{sample}}_{{ext}}.faa"
     output:
-        tsv=f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot_lca.tsv"
+        out=f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot.m8"
     log:
         f"{OUTDIR}/logs/{{sample}}_{{ext}}_annot_prot.log"
     params:
-        out=f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot",
         db=PROTDB,
-         tmp=temp(f"{OUTDIR}/tmp"),
+        tmp=temp(f"{OUTDIR}/tmp"),
     threads: int(workflow.cores * 0.75)
+    resources:
+        mem='30G'
     shell:
         """ 
-        mmseqs easy-taxonomy {input} {params.db} {params.out} {params.tmp} -e 1e-5 -s 7 --blacklist "" --tax-lineage 1 >> {log}
+        mmseqs easy-search {input} {params.db} {output.out} {params.tmp} --threads {threads} -s 6  --split-memory-limit {resources.mem}\
+        --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
         """
 
 # Profile level annotations
 rule annot_prof:
     input:
-        f"{INDIR}/{{sample}}.{{ext}}"
+        f"{OUTDIR}/prot/{{sample}}_{{ext}}.faa"
     output:
         f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof.m8"
     log:
@@ -97,10 +176,12 @@ rule annot_prof:
         db=PROFDB,
         tmp=temp(f"{OUTDIR}/tmp"),
     threads: int(workflow.cores * 0.75)
+    resources:
+        mem='30G'
     shell:
         """ 
-        mmseqs easy-search {input} {params.db} {output} {params.tmp} --search-type 2 \
-        --format-output query,target,fident,pident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage >> {log}
+        mmseqs easy-search {input} {params.db} {output} {params.tmp} --threads {threads} -s 6 --split-memory-limit {resources.mem}\
+        --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
         
         """
 
@@ -108,7 +189,7 @@ rule summarize:
     input:
         DATADIR=DBDIR,
         PROF = f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof.m8",
-        PROT = f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot_lca.tsv",
+        PROT = f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot.m8",
         NUC = f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome.m8",
         FASTA = f"{INDIR}/{{sample}}.{{ext}}",
 
@@ -120,7 +201,7 @@ rule summarize:
     threads: int(workflow.cores * 0.75)
     shell:
         """ 
-        postprocess.py {input.DATADIR} {input.NUC} {input.PROT} {input.PROF} {input.FASTA} {output} >> {log}
+        postprocess.py {input.DATADIR} {input.NUC} {input.PROT} {input.PROF} {input.FASTA} {output} &> {log}
         
         """
 
@@ -134,6 +215,6 @@ rule ictv_results:
         f"{OUTDIR}/logs/{{sample}}_{{ext}}_ictv_out.log"
     shell:
         """
-        ictv_out.py {input.DATADIR} {input.INFILE} {output} >> {log}
+        ictv_out.py {input.DATADIR} {input.INFILE} {output} &> {log}
         """
 # mmseqs easy-taxonomy {input} {params.db} {params.out} {params.tmp} -e 1e-5 -s 7 --blacklist "" --tax-lineage 1 --search-type 3 >> {log}
