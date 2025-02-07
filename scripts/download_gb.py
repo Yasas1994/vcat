@@ -5,13 +5,11 @@ from sys import argv
 import sys
 import re
 import requests
+from vcat.color_logger import logger
 
 infile = argv[1]
 outdir = argv[2]
 
-# Redirect stderr to a file
-stderr = open(argv[3], "w")
-sys.stderr = stderr
 
 # Regular expression pattern
 pattern = r"https://www\.ncbi\.nlm\.nih\.gov/nuccore/.+"
@@ -73,9 +71,9 @@ for i in range(0, len(all_ids), 200):
         # Save the FASTA data to a file
         with open(f"{DBDIR}/sequences_{i}_{i+200}.gb", "w") as file:
             file.write(response.text)
-        print(f"FASTA file downloaded successfully as sequences_{i}_{i+200}.gb", file=stderr)
+        logger.info(f"FASTA file downloaded successfully as sequences_{i}_{i+200}.gb")
     else:
-        print(f"Failed to retrieve data. HTTP Status Code: {response.status_code}", file=stderr)
+        logger.info(f"Failed to retrieve data. HTTP Status Code: {response.status_code}")
 
 
 open(f"{DBDIR}/download_complete", "w").close()
