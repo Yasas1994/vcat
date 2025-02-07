@@ -1,92 +1,70 @@
-import os, sys
-import logging, traceback
+import os
+import sys
+import logging
+import traceback
 
-# root logger
-logger = logging.getLogger()
 
-grey = "\x1b[38;21m"
-green = "\x1b[32;21m"
-yellow = "\x1b[33;21m"
-red = "\x1b[31;21m"
-bold_red = "\x1b[31;1m"
-reset = "\x1b[0m"
 
-prefix = "[vcat] "
+# ANSI escape sequences for colored output
+COLORS = {
+    logging.DEBUG: "\x1b[38;20m",       # Grey
+    logging.INFO: "\x1b[37;20m",        # Green
+    logging.WARNING: "\x1b[33;20m",     # Yellow
+    logging.ERROR: "\x1b[31;20m",       # Red
+    logging.CRITICAL: "\x1b[31;1m",     # Bold Red
+}
+RESET = "\x1b[0m"
+
+PREFIX = "[vcat] "
 
 
 class ColorFormatter(logging.Formatter):
-    def __init__(
-        self,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)",
-    ):
+    """Custom formatter to add colors to log levels."""
+    def __init__(self, fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"):
+        super().__init__(fmt)  # Ensure parent class initializes properly
         self.FORMATS = {
-            logging.DEBUG: prefix + grey + format + reset,
-            logging.INFO: prefix + green + format + reset,
-            logging.WARNING: prefix + yellow + format + reset,
-            logging.ERROR: prefix + red + format + reset,
-            logging.CRITICAL: prefix + red + format + reset,
+            level: PREFIX + color + fmt + RESET for level, color in COLORS.items()
         }
 
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
+        """Format log messages with the corresponding color."""
+        log_fmt = self.FORMATS.get(record.levelno, self._fmt)  # Use default if not found
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
 
-#
-logging_format = "%(levelname)s: %(message)s"
-# datefmt="%Y-%m-%d %H:%M"
-#
-#
-#
-#
-#
-# fileHandler = logging.FileHandler("atlas.log",mode='w')
-# fileHandler.setFormatter(logging.Formatter(logging_format))
-# fileHandler.setLevel(logging.DEBUG)
-#
-#
-#
-# creat console logging
+# Define logging format
+LOGGING_FORMAT = "%(levelname)s: %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M"
+
+# Create console logging handler
 consoleHandler = logging.StreamHandler()
 consoleHandler.setLevel(logging.INFO)
-consoleHandler.setFormatter(ColorFormatter(logging_format))
+consoleHandler.setFormatter(ColorFormatter(LOGGING_FORMAT))
 
-
-#
-
-## Define logging
+# Configure the root logger
 logging.basicConfig(
     level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M",
-    format=logging_format,
+    datefmt=DATE_FORMAT,
+    format=LOGGING_FORMAT,
     handlers=[consoleHandler],
 )
-logging.captureWarnings(True)
 
-
-# create logging for atlas
-
+logging.captureWarnings(True)  # Capture warnings as log messages
+# Root logger
+logger = logging.getLogger()
 
 def handle_exception(exc_type, exc_value, exc_traceback):
+    """Global exception handler to log uncaught exceptions."""
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
 
     logger.error(
-        "".join(
-            [
-                "Uncaught exception: ",
-                *traceback.format_exception(exc_type, exc_value, exc_traceback),
-            ]
-        )
+        "Uncaught exception:\n%s",
+        "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)),
     )
 
 
 # Install exception handler
 sys.excepthook = handle_exception
-
-# root logger
-logger = logging.getLogger()
-
-# logger= logging
