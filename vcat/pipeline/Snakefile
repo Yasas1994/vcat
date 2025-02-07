@@ -22,8 +22,8 @@ f = subprocess.run(["seqkit", "stats", INFILES], capture_output=True, text=True)
 file_stats = dict(zip(f.stdout.split("\n")[0].split(),
 f.stdout.split("\n")[1].split()))
 
-if int(file_stats["num_seqs"]) <= workflow.cores:
-    PRODIGAL_SPLITS = int(file_stats["num_seqs"])
+if int(file_stats["num_seqs"].replace("," ,"")) <= workflow.cores:
+    PRODIGAL_SPLITS = int(file_stats["num_seqs"].replace(",", ""))
 else:
     PRODIGAL_SPLITS = workflow.cores
 
