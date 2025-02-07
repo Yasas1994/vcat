@@ -12,7 +12,8 @@ import openpyxl
 from sys import argv
 from tqdm import tqdm
 from glob import glob
-
+import sys
+from vcat.color_logger import logger
 
 # Specify the path to the custom taxdump database
 DATADIR=argv[1]  # SQLite database path
@@ -20,14 +21,11 @@ DBFILE =argv[2]
 XLTABLE=argv[3] 
 GBDIR=argv[4] 
 SEQDIR=argv[5] 
-LOG=argv[6] 
 
-# Redirect stderr to a file
-stderr = open(LOG, "w")
 
 def extract_regions(string):
     r = [list(map(int, i)) for i in re.findall(r"\((\d+)\.{1,3}(\d+)\)", string)]
-    # print(r, file=stderr)
+    logger.info(r)
     return r
 
 def filter_genbank(ids):
@@ -67,7 +65,7 @@ for row in ictv[['Taxid','Virus name(s)',  'IDS', 'Range']].iterrows(): # ID = g
         if row[1]['Range']:
             if len(row[1]['Range']) > 0:
                 id2range[i] = row[1]['Range']
-print(id2range)
+logger.info(id2range)
 ictv["IDS_NR"] = ictv["IDS"].apply(lambda x : filter_genbank(x)) 
 all_nrids =[]
 for ii in ictv.iterrows():
@@ -136,7 +134,7 @@ for file in tqdm(all_files):
 with open(f'{SEQDIR}/proteins.faa', "w") as output_handle:
     SeqIO.write(proteins, output_handle, "fasta")
 
-print(f'{SEQDIR}/proteins.faa created', file=stderr)
+logger.info(f'{SEQDIR}/proteins.faa created')
 
 # Write accession2taxid file
 #accession       accession.version       taxid   gi
@@ -173,7 +171,7 @@ with open(f'{SEQDIR}/virus_protein.accession2taxid','w') as fh2:
                             # if the feature lies within prophage co-ordinates 
                             if min(feature_range[0], start) == feature_range[0] and max(feature_range[1], end) == feature_range[1]: 
                                 fh2.write(f"{protein_id.split('.')[0]}\t{protein_id}\t{id2newtax[record.accession[0]]}\t{'-'}\n")
-print(f'{SEQDIR}/virus_protein.accession2taxid created', file=stderr)
+logger.info(f'{SEQDIR}/virus_protein.accession2taxid created')
 
 seq_records = []
 for file in tqdm(all_files):
@@ -183,7 +181,7 @@ for file in tqdm(all_files):
 
                 if record.version.split(".")[0] in id2range:
                     feature_range = id2range[record.version.split(".")[0]][0]
-                    print(record.version.split(".")[0], feature_range)
+                    logger.info(f'{record.version.split(".")[0]}, {feature_range}')
                 else:
                     feature_range = 0, None
 
@@ -197,7 +195,7 @@ for file in tqdm(all_files):
 with open(f'{SEQDIR}/genomes.fna', "w") as output_handle:
     SeqIO.write(seq_records, output_handle, "fasta")
 
-print(f'{SEQDIR}/genomes.fna created', file=stderr)
+logger.info(f'{SEQDIR}/genomes.fna created')
 
 # Write accession2taxid file
 #accession       accession.version       taxid   gi
@@ -210,4 +208,4 @@ with open(f'{SEQDIR}/virus_genome.accession2taxid','w') as fh2:
                 if record.version.split(".")[0] in all_nrids:
                     fh2.write(f"{record.accession[0].split('.')[0]}\t{record.accession[0].split('.')[0]}\t{id2newtax[record.accession[0]]}\t{'-'}\n")
 
-print(f'{SEQDIR}/virus_genome.accession2taxid created', file=stderr)
+logger.info(f'{SEQDIR}/virus_genome.accession2taxid created')
