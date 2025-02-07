@@ -41,18 +41,59 @@ mamba create env -f environment.yml
 pip install .
 
 # test the installation
-vcat -h
+vcat --help
+
+Usage: vcat [OPTIONS] COMMAND [ARGS]...
+
+  vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus
+  contigs, mapping reads to virus genomes and much more.
+  (https://github.com/Yasas1994/vcat)
+
+Options:
+  --version   Show the version and exit.
+  -h, --help  Show this message and exit.
+
+Commands:
+  contigs    run contig annotation workflow
+  preparedb  download and build reference databases
+  reads      run read annotation workflow
+  utils      tool chain for calculating ani, aai and visualizations
+
 ```
 
-#### how to run?
+---
+#### download and prepare the databases
+---
 ```
-# download and prepare the databases
 vcat preparedb -d databases
-
-# run vcat
-vcat annotate -i <input>.fasta -o <output>
 ```
 
+---
+#### running vcat
+---
+```
+
+# run vcat contig annotation pipeline
+vcat contigs -i <input>.fasta -o outdir
+
+# run vcat read annotation pipeline (comming soon)
+vcat reads -i1 <reads1>.fastq [-i2 <reads2.fastq>] -o outdir
+
+# calculate aai of query contigs to ICTV genomes
+vcat utils aai  [OPTIONS] -i contigs.m8 -g configs.gff -d [DBDIR]
+
+# calculate ani of query contigs to ICTV genomes
+vcat utils ani [OPTIONS] -i contigs.m8
+
+# creating genome comparision plots. i.e query sequence to highly similar ICTV genomes (comming soon)
+vcat utils visualize --ani --taxa [taxname] -i contigs.m8 -o outdir
+
+# create phage contig annotation plots (coming soon)
+vcat utils visualize --phrogs -i contigs.fasta -o outdir 
+
+# identify provirus (coming soon)
+vcat utils provirus -i contigs.fasta -o outdir
+```
 
 ##### Expected runtime ?
 
