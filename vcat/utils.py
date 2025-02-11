@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 import mmap
 import pickle
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from io import StringIO  
 
 # pandas implementation: readable but slow
@@ -30,7 +30,7 @@ from io import StringIO
 # def compute_cov(alns):   
 #     t = alns[["qstart", "qend"]].to_numpy()
 #     # sort both axis of the interval tree and merge overlaps
-#     merged = merge_intervals(np.sort(np.sort(t, axis=0), axis=1))
+#     merged =  merge_intervals(np.sort(t, axis=1)[np.argsort(t, axis=0)[:,0]])
 #     # calculate query coverage
 #     return np.round(np.diff(merged).sum()/alns["qlen"].iloc[0], 2)
 
@@ -73,12 +73,12 @@ def compute_cov(alns: List[pl.Series]) -> float:
     """Compute query coverage using polars and numpy"""
 
     t = np.stack((alns[0].to_numpy(), alns[1].to_numpy()), axis=1)
-    merged = merge_intervals(np.sort(np.sort(t, axis=0), axis=1))
-    return np.round(np.sum(np.diff(merged)) / alns[2][0], 3)
+    merged =  merge_intervals(np.sort(t, axis=1)[np.argsort(t, axis=0)[:,0]])
+    return np.round(np.sum(np.diff(merged)) / alns[2][0], 2)
 
 
 # ** Process the grouped data **
-def ani_summary(infile: str, outfile: str, header: list) -> Union[int, Exception]:
+def ani_summary(infile: str, outfile: str, all:bool, header: list) -> Union[int, Exception]:
     try:
         mmseqs_nuc = pl.read_csv(infile,
                             has_header = False,
@@ -94,7 +94,7 @@ def ani_summary(infile: str, outfile: str, header: list) -> Union[int, Exception
                 # to do: re-implement in native api
                 pl.map_groups(exprs=["qstart", "qend", "qlen"],function=lambda df: compute_cov(df), return_dtype=pl.Float64).alias("qcov"),
                 # computes ani 
-                ((pl.col("alnlen") * pl.col("fident")).sum()/pl.col("alnlen").sum()).round(3).alias("ani"),
+                ((pl.col("alnlen") * pl.col("fident")).sum()/pl.col("alnlen").sum()).round(2).alias("ani"),
                 
 
             ])
@@ -105,10 +105,14 @@ def ani_summary(infile: str, outfile: str, header: list) -> Union[int, Exception
             (pl.col("ani") * pl.col("qcov")).round(3).alias("tani")
         )
 
-        best_hits = output.filter(
-            pl.col("tani") == output.group_by("query").agg(pl.max("tani")).join(output, on="query")["tani"]
-        )
-        best_hits.write_csv(outfile,  separator="\t")
+        if not all:
+            best_hits = output.filter(
+                pl.col("tani") == output.group_by("query").agg(pl.max("tani")).join(output, on="query")["tani"]
+            )
+            best_hits.write_csv(outfile,  separator="\t")
+        else:
+            output.write_csv(outfile,  separator="\t")
+
         return 0
     except Exception as e:
         return e
@@ -122,17 +126,39 @@ def trim_lineage(taxid: int, taxdb: taxopy.core.TaxDb) -> int:
         return taxdb.taxid2parent[taxid]
     return taxid
 
-def get_taxid2taxon_map(df: pl.DataFrame, taxdb: taxopy.core.TaxDb) -> dict[int,taxopy.Taxon]:
+def get_taxid2taxon_map(df: pl.DataFrame, taxdb: taxopy.core.TaxDb) -> dict[OrderedDict]:
     tmap = dict()
     for x in list(df["taxid"].unique()):
-        tmap[x] =  taxopy.Taxon(x, taxdb=taxdb)
+        tmap[x] =  taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
     return tmap
+
+def cal_aai(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb) -> tuple[pl.DataFrame, pl.Series]:
+    tmp = df.filter(pl.col(rank) > 1).\
+        group_by(["seqid",rank]).agg(
+                                        ((pl.col("fident") * pl.col("alnlen")).sum()/ pl.col("alnlen").sum()).round(3).alias("aai"),
+                                        (pl.col("qlen").unique().len()/ pl.first("qlens").list.len()).round(3).alias("qcov"),
+                                        pl.first("qseqlen"),
+                                        pl.col("qlen").unique().len().alias("mgenes"),
+                                        (pl.first("qlens").list.len()).round(3).alias("qgenes"))\
+                                    .with_columns(
+                                        (pl.col("aai") * pl.col("qcov")).round(3).alias("taai"),
+                                            )\
+                                    .group_by("seqid")\
+                                .agg(
+                                        pl.all().sort_by('taai').last(),
+                                        )
+    tmp2 = tmp.sort('taai').filter(pl.col('taai') >= threshold)\
+    .with_columns(pl.col(rank).map_elements(lambda x : str(taxopy.Taxon(x, taxdb=taxdb)),
+                                               return_dtype=str ).alias("taxlineage"))\
+    .with_columns(level = pl.lit(rank))
+    
+    return (tmp2.rename({rank: "taxid"}), tmp.filter(pl.col('taai') < threshold)["seqid"])
 
 def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Union[int, Exception]:
     # ps: optimized for speed not for readability
-    # to: to run a second round of aai calculations at the next taxonomic rank
-    # or to calculate aai at every taxonomic rank until kingdom
-    TAAI_CUTOFF = 0.3
+
+    THRESHOLDS = {"genus": 0.3, "family": 0.3, "order": 0.3, "class" : 0.3, "phylum": 0.3 }
+
     taxdb = taxopy.TaxDb(nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
                     names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
                     merged_dmp=f"{dbdir}/ictv-taxdump/merged.dmp")
@@ -141,11 +167,12 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
     with open(gff) as fh:
         for i in fh:
             if i.startswith("# Sequence Data:"):
-                for j in i.split()[-1].split(";"):
+
+                for j in i.rstrip("\n").strip("# Sequence Data: ").split(";", 2):
                     if j.startswith("seqlen="):
                         s = j.lstrip("seqlen=")
                     elif j.startswith("seqhdr="):
-                        h =j.lstrip("seqhdr=").strip('"')
+                        h =j.lstrip("seqhdr=").strip('"').split()[0]
                 leninf.append({"seqid": h, "qseqlen" : int(s)})
 
     seqleninfo = pl.DataFrame(leninf)
@@ -160,7 +187,7 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
                         schema_overrides={"start": pl.Int64, "end": pl.Int64, "score": pl.Float64})
     
 
-    gff_df = gff_df.with_columns((pl.col("seqid")+ pl.col("attributes")\
+    gff_df = gff_df.with_columns((pl.col("seqid") + pl.col("attributes")\
                                   .map_elements(lambda x : f'_{x.split(";")[0].strip("ID=").split("_")[-1]}', 
                                                  return_dtype=str)).alias("query"))
     gff_df = gff_df.join(seqleninfo, on="seqid", how="inner")
@@ -178,11 +205,18 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
                                                            return_dtype=int))
     taxonmap = get_taxid2taxon_map(mmseqs_nuc, taxdb=taxdb)
 
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: str(taxonmap.get(x, 'no_rank')),
-                                                           return_dtype=str).alias("taxlineage"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap.get(x, 'no_rank').name,
-                                                            return_dtype=str).alias("taxname"))
-    
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("species", -1),
+                                                            return_dtype=int).alias("species"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("genus", -1),
+                                                            return_dtype=int).alias("genus"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("family", -1),
+                                                            return_dtype=int).alias("family"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("order", -1),
+                                                            return_dtype=int).alias("order"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("class", -1),
+                                                            return_dtype=int).alias("class"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("phylum", -1),
+                                                            return_dtype=int).alias("phylum"))
     seqid2qlens = mmseqs_nuc.group_by("seqid")\
                 .agg(
                     pl.col("qlen").unique().alias("qlens")
@@ -190,25 +224,16 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
     mmseqs_nuc = mmseqs_nuc.join(seqid2qlens, on="seqid", how="left")
 
     try: 
-            mmseqs_nuc.filter(pl.col("taxid") > 1).\
-                group_by(["seqid","taxid"]).agg(
-                                                pl.first("taxlineage"),
-                                                pl.first("taxname"),
-                                                pl.first("qseqlen"),
-                                                ((pl.col("fident") * pl.col("alnlen")).sum()/ pl.col("alnlen").sum()).round(3).alias("aai"),
-                                                (pl.col("qlen").unique().len()/ pl.first("qlens").list.len()).round(3).alias("qcov"),
-                                                pl.col("qlen").unique().len().alias("mgenes"),
-                                                (pl.first("qlens").list.len()).round(3).alias("qgenes"))\
-                                            .with_columns(
-                                                (pl.col("aai") * pl.col("qcov")).round(3).alias("taai"),
-                                                    )\
-                                            .group_by("seqid")\
-                                        .agg(
-                                                pl.all().sort_by('taai').last(),
-                                                ) \
-                                            .sort('taai').filter(pl.col('taai') > TAAI_CUTOFF)\
-                                            .write_csv(outfile,  separator="\t")
-            return 0
+        results = []
+        unmatched = mmseqs_nuc["seqid"]
+        for i in ["genus", "family", "order", "class", "phylum"]:
+            mmseqs_nuc_f = mmseqs_nuc.filter(pl.col("seqid").is_in(unmatched))
+            tmp, unmatched = cal_aai(mmseqs_nuc_f, rank=i, threshold=THRESHOLDS[i], taxdb=taxdb)
+   
+            results.append(tmp)
+
+        pl.concat(results).write_csv(outfile,  separator="\t")
+        return 0
     except Exception as e:
         return e
 
@@ -226,7 +251,7 @@ def index_m8(input: str) -> defaultdict[list]:
         total_size = len(mmapped_file)
 
         pbar = tqdm(unit="lines")
-        
+
         pos = 0
         while pos < total_size:
             end = mmapped_file.find(b"\n", pos)
@@ -269,4 +294,10 @@ def load_chunk(input: str,
                 string_dump += mmapped_file[pos:end].decode()+"\n"
 
     return StringIO(string_dump)
-                
+
+
+# bbmap.sh in=ERR2368798_1.fastq in2=ERR2368798_2.fastq path=/media/ssd/ICTV-TaxonomyChallenge/vcat/databases/VMR_latest/bbmap_index build=1 out=ERR2368798.sam covstats=ERR2368798.stats idfilter=0.7
+# samtools sort ERR2368798.sam -o ERR2368798.bam
+# samtools index -M ERR2368798.bam
+# less ERR2368798.stats  | awk -F "\t" '$2 > 1'
+# samtools coverage ERR2368798.bam -r 'MT249221 [Mourilyan virus] VRL' --histogram
