@@ -7,6 +7,7 @@ dependencies:
   - aria2
   - csvtk
   - seqkit
+  - bbmap
   - taxopy
   - rapidfuzz
   - taxonkit=0.18.0
