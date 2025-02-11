@@ -557,7 +557,6 @@ def ani(input, header, ani, tani, qcov, all, batch):
     help="number of records to process at a time",
     required=False
 )
-def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
 @click.option(
     "--batch",
     type=int,

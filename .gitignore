@@ -8,3 +8,6 @@ vcat/__pycache__/*
 vcat_conda/*
 results/*
 databases/*
+example/*
+meta/*
+vcat.egg-info/*
