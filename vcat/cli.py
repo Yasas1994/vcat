@@ -7,6 +7,9 @@ import yaml
 import polars as pl
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+import polars as pl
+from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 from vcat.utils import ani_summary, aai_summary, index_m8, load_chunk
 
 
@@ -547,6 +550,14 @@ def ani(input, header, ani, tani, qcov, all, batch):
     help="path to the ref databases",
     required=True
 )
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False
+)
+def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
 @click.option(
     "--batch",
     type=int,

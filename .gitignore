@@ -7,3 +7,4 @@ vcat/__pycache__/*
 *snakemake*
 vcat_conda/*
 results/*
+databases/*

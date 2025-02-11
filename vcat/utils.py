@@ -130,6 +130,7 @@ def get_taxid2taxon_map(df: pl.DataFrame, taxdb: taxopy.core.TaxDb) -> dict[Orde
     tmap = dict()
     for x in list(df["taxid"].unique()):
         tmap[x] =  taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
+        tmap[x] =  taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
     return tmap
 
 def cal_aai(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb) -> tuple[pl.DataFrame, pl.Series]:
@@ -173,6 +174,7 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
                         s = j.lstrip("seqlen=")
                     elif j.startswith("seqhdr="):
                         h =j.lstrip("seqhdr=").strip('"').split()[0]
+                        h =j.lstrip("seqhdr=").strip('"').split()[0]
                 leninf.append({"seqid": h, "qseqlen" : int(s)})
 
     seqleninfo = pl.DataFrame(leninf)
@@ -186,7 +188,6 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
                         new_columns=col_names, 
                         schema_overrides={"start": pl.Int64, "end": pl.Int64, "score": pl.Float64})
     
-
     gff_df = gff_df.with_columns((pl.col("seqid") + pl.col("attributes")\
                                   .map_elements(lambda x : f'_{x.split(";")[0].strip("ID=").split("_")[-1]}', 
                                                  return_dtype=str)).alias("query"))
@@ -205,6 +206,18 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
                                                            return_dtype=int))
     taxonmap = get_taxid2taxon_map(mmseqs_nuc, taxdb=taxdb)
 
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("species", -1),
+                                                            return_dtype=int).alias("species"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("genus", -1),
+                                                            return_dtype=int).alias("genus"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("family", -1),
+                                                            return_dtype=int).alias("family"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("order", -1),
+                                                            return_dtype=int).alias("order"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("class", -1),
+                                                            return_dtype=int).alias("class"))
+    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("phylum", -1),
+                                                            return_dtype=int).alias("phylum"))
     mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("species", -1),
                                                             return_dtype=int).alias("species"))
     mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("genus", -1),
