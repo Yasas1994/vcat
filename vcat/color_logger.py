@@ -34,7 +34,7 @@ class ColorFormatter(logging.Formatter):
 
 
 # Define logging format
-LOGGING_FORMAT = "%(levelname)s: %(message)s"
+LOGGING_FORMAT = "%(asctime)s | %(levelname)s: %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M"
 
 # Create console logging handler
