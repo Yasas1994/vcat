@@ -10,6 +10,7 @@ rule all:
         f"{DBDIR}/VMR_latest/virus_protein.accession2taxid",
         f"{DBDIR}/VMR_latest/proteins.faa",
         f"{DBDIR}/VMR_latest/genomes.fna",
+        f"{DBDIR}/VMR_latest/bbmap_index/index_done",
         f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins",
         f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes",
         f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles",
@@ -67,9 +68,9 @@ rule make_mmseqs_proteindb:
         map=f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins_mapping"
     shell:
         """
-        mmseqs createdb --dbtype 1 {input.seqs} {output}  >> {log}
+        mmseqs createdb --dbtype 1 {input.seqs} {output}  2> {log}
         mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  >> {log}
-        mmseqs nrtotaxmapping {input.map} {output} {params.map}  >> {log}
+        mmseqs nrtotaxmapping {input.map} {output} {params.map}  2> {log}
         """
 
 rule make_mmseqs_genomedb:
@@ -86,9 +87,25 @@ rule make_mmseqs_genomedb:
         map=f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes_mapping"
     shell:
         """
-        mmseqs createdb --dbtype 0 {input.seqs} {output}  >> {log}
-        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  >> {log}
-        mmseqs nrtotaxmapping {input.map} {output} {params.map}  >> {log}
+        mmseqs createdb --dbtype 0 {input.seqs} {output}  2> {log}
+        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  2> {log}
+        mmseqs nrtotaxmapping {input.map} {output} {params.map}  2> {log}
+        """
+
+rule make_bbmap_index:
+    input:
+        seqs=f"{DBDIR}/VMR_latest/genomes.fna",
+    output:
+        f"{DBDIR}/VMR_latest/bbmap_index/index_done"
+    log:
+        f"{DBDIR}/logs/make_bbmap_genomedb.log"
+    params:
+        build = 1
+        outdir=f"{DBDIR}/VMR_latest/bbmap_index"
+    shell:
+        """
+        bbmap.sh ref={input} path={params.outdir} build={params.build} &> {log} && touch {output}
+
         """
 
 rule make_mmseqs_profiledb:
@@ -114,11 +131,11 @@ rule make_mmseqs_profiledb:
         """
         mkdir -p {output.pclustdir} >> {log}
         mkdir -p {params.profiledir} >> {log}
-        mmseqs cluster {input.proteindb} {params.pclustdb} {params.tmp} --cluster-reassign  -s 7 >> {log}
-        mmseqs createtsv {input.proteindb} {input.proteindb} {params.pclustdb} {params.clusters_tsv} >> {log}
-        mmseqs createsubdb {params.pclustdb}  {input.proteindb} {params.seqrep}  >> {log}
-        mmseqs createsubdb {params.pclustdb}  {params.protein_h} {params.seqrep_h}  >> {log}
-        mmseqs result2profile {params.seqrep} {input.proteindb} {params.pclustdb} {output.profiledb}  >> {log}
+        mmseqs cluster {input.proteindb} {params.pclustdb} {params.tmp} --cluster-reassign  -s 7 2> {log}
+        mmseqs createtsv {input.proteindb} {input.proteindb} {params.pclustdb} {params.clusters_tsv} 2> {log}
+        mmseqs createsubdb {params.pclustdb}  {input.proteindb} {params.seqrep}  2> {log}
+        mmseqs createsubdb {params.pclustdb}  {params.protein_h} {params.seqrep_h}  2> {log}
+        mmseqs result2profile {params.seqrep} {input.proteindb} {params.pclustdb} {output.profiledb}  2> {log}
 
         """
 
