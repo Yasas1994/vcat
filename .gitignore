@@ -5,3 +5,5 @@ notebooks/*
 vcat/__pycache__/*
 .snakemake
 *snakemake*
+vcat_conda/*
+results/*
