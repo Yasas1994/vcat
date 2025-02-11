@@ -4,6 +4,9 @@ import multiprocessing
 import os
 import sys
 import yaml
+import polars as pl
+from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 from vcat.utils import ani_summary, aai_summary, index_m8, load_chunk
 
 
@@ -427,22 +430,56 @@ def utils(obj):
     help="filter results below this ani cutoff",
     required=False
 )
-def ani(input, header, ani, tani, qcov):
+@click.option(
+    "--all",
+    is_flag=True,
+    default=False,
+    help="get ani for all hits per query sequence. by default only outputs the besthits",
+    required=False
+)
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False
+)
+def ani(input, header, ani, tani, qcov, all, batch):
     """
     calculates the average nucleotide identity and coverage of a query sequence 
     to the best 
     """
+    
+    CHUNK_SIZE = batch
     file_name = os.path.basename(input)
-    outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_ani.tsv")
-    status = ani_summary(input,outfile, header)
-    if status == 0:
-        logger.info(f"{outfile} updated")
-        
-    else:
-        # exit code 1
-        logger.error("error occured!")
-        logger.error(status)
+    
+    index = index_m8(input)
+    tmp_files = []
+    with logging_redirect_tqdm():
+        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
+            finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
+            outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv")
+            status = ani_summary(finput, outfile, all=all, header=header)
+            if status == 0:
+                logger.info(f"{outfile} updated")
+                tmp_files.append(outfile)
+                
+            else:
+                # exit code 1
+                logger.error("error occured!")
+                logger.exception(status)
+                exit(1)
 
+    logger.info("merging temporary files")
+    tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
+    df = pl.concat([i for i in tmp if not i.is_empty()])
+    outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_ani.tsv")
+    df.write_csv(outfile, separator="\t")
+    logger.info(f"{outfile} updated")
+
+    # Remove temporary TSV files
+    for file in tmp_files:
+        os.remove(file)
 
 @utils.command(
     context_settings=dict(ignore_unknown_options=True),
@@ -510,26 +547,49 @@ def ani(input, header, ani, tani, qcov):
     help="path to the ref databases",
     required=True
 )
-def aai(input, header, aai, taai, qcov, dbdir, gff):
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False
+)
+def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
     """
     calculates the average aminoacid identity and coverage of a query sequence 
     to the best 
     """
-    CHUNK_SIZE = 5000
+    CHUNK_SIZE = batch
     file_name = os.path.basename(input)
     
     index = index_m8(input)
-    for i in range(0, len(index), CHUNK_SIZE):
-        finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
-        outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv")
-        status = aai_summary(finput, gff, dbdir, outfile, header)
-        if status == 0:
-            logger.info(f"{outfile} updated")
-            
-        else:
-            # exit code 1
-            logger.error("error occured!")
-            logger.error(status)
+    tmp_files = []
+    with logging_redirect_tqdm():
+        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
+            finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
+            outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv")
+            status = aai_summary(finput, gff, dbdir, outfile, header)
+            if status == 0:
+                logger.info(f"{outfile} updated")
+                tmp_files.append(outfile)
+                
+            else:
+                # exit code 1
+                logger.error("error occured!")
+                logger.exception(status)
+                exit(1)
+
+    logger.info("merging temporary files")
+    tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
+    df = pl.concat([i for i in tmp if not i.is_empty()])
+    outfile = os.path.join(os.path.dirname(input),
+                           f"{file_name.split('.')[0]}{'_all' if all else ''}_aai.tsv")
+    df.write_csv(outfile, separator="\t")
+    logger.info(f"{outfile} updated")
+
+    # Remove temporary TSV files
+    for file in tmp_files:
+        os.remove(file)
 
 cli.add_command(utils)
 
