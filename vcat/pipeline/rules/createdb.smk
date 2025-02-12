@@ -100,7 +100,7 @@ rule make_bbmap_index:
     log:
         f"{DBDIR}/logs/make_bbmap_genomedb.log"
     params:
-        build = 1
+        build = 1,
         outdir=f"{DBDIR}/VMR_latest/bbmap_index"
     shell:
         """
