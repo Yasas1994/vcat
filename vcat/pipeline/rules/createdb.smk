@@ -33,7 +33,7 @@ rule download_genbank:
 # preprocess and prepare .gb files to build mmseqs datasets
 rule prepare:
     input:
-        DATADIR=f"{DBDIR}/ictv-taxdump.tar.gz",
+        DATADIR=f"{DBDIR}",
         XLTABLE=f"{DBDIR}/ictv.xlsx",
         MAN=f"{DBDIR}/VMR_latest/tmp/download_complete"
 
@@ -46,12 +46,12 @@ rule prepare:
     log:
         f"{DBDIR}/logs/prepare.log"
     params:
-        DBFILE =f"{DBDIR}/VMR_latest/VMR_latest.sql",
+    
         GBDIR=f"{DBDIR}/VMR_latest/tmp",
         SEQDIR=f"{DBDIR}/VMR_latest",
     shell:
         """
-        prepare.py {input.DATADIR} {params.DBFILE} {input.XLTABLE} {params.GBDIR} {params.SEQDIR} 2> {log}
+        prepare.py {input.DATADIR} {input.XLTABLE} {params.GBDIR} {params.SEQDIR} 2> {log}
         """
      
 rule make_mmseqs_proteindb:

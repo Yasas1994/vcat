@@ -18,15 +18,14 @@ import openpyxl
 from sys import argv
 from tqdm import tqdm
 from glob import glob
-import sys
+import taxopy
 from vcat.color_logger import logger
 
 # Specify the path to the custom taxdump database
-DATADIR=argv[1]  # SQLite database path
-DBFILE =argv[2] 
-XLTABLE=argv[3] 
-GBDIR=argv[4] 
-SEQDIR=argv[5] 
+DATABASE_DIR=argv[1]  # SQLite database path
+XLTABLE=argv[2] 
+GBDIR=argv[3] 
+SEQDIR=argv[4] 
 
 
 def extract_regions(string):
@@ -45,7 +44,18 @@ def filter_genbank(ids):
         return ids
 
 
-ictv_tax = NCBITaxa(dbfile=DBFILE, taxdump_file=DATADIR)
+def extract_from_hyperlink(hypstr):
+    url_match = re.search(r'=HYPERLINK\("([^"]+)"', hypstr)
+    url = url_match.group(1) if url_match else None
+    text_match = re.search(r',"([^"]+)"\)', hypstr)
+    display_text = text_match.group(1) if text_match else None
+    return {"url": f'{url}', "display_text": f'{display_text}'}
+
+
+taxdb = taxopy.TaxDb(nodes_dmp=f"{DATABASE_DIR}/ictv-taxdump/nodes.dmp",
+                     names_dmp=f"{DATABASE_DIR}/ictv-taxdump/names.dmp",
+                     merged_dmp=f"{DATABASE_DIR}/ictv-taxdump/merged.dmp")
+
 wb = openpyxl.load_workbook(XLTABLE)
 sheets = wb.sheetnames
 ws = wb[sheets[1]]
@@ -55,12 +65,17 @@ data = ws.values  # Extract cell values
 columns = next(data)  # Extract the first row for column headers
 ictv = pd.DataFrame(data, columns=columns)
 
+# =HYPERLINK("https://ictv.global/taxonomy/taxondetails?taxnode_id=202308643","Alphalipothrixvirus beppuense")
+# =HYPERLINK("https://www.ncbi.nlm.nih.gov/nuccore/MH447526","NCBI Nucleotide")
+
 ictv = ictv[ictv["Accessions Link"].notna()]
-ictv["Species"] = ictv["Species"].apply(lambda x: x.strip("\""))
-ictv["Taxid"] = ictv["Species"].apply(lambda x : list(ictv_tax.get_name_translator([x]).values())[0][0])
-ictv["IDS"] = ictv.apply(lambda x: x["Accessions Link"].split("\"")[1].split("/")[-1].split(","), axis=1)
-  
+ictv["Species"] = ictv["Species"].apply(lambda x: extract_from_hyperlink(x)["display_text"])
+ictv["Taxid"] = ictv["Species"].apply(lambda x : taxopy.taxid_from_name(x, taxdb))
+ictv["IDS"] = ictv.apply(lambda x: extract_from_hyperlink(x["Accessions Link"])["display_text"].split(","), axis=1)
 ictv["Range"] = ictv.apply(lambda x: extract_regions(x["Virus GENBANK accession"] ), axis=1)
+
+
+
 
 id2newtax = {}
 id2range = {}
