@@ -27,7 +27,7 @@ rule download_genbank:
         f"{DBDIR}/logs/download_genbank.log"
     shell:
         """
-        download_gb.py {input} {output} 2> {log}
+        download_gb.py {input} {output} &> {log}
         """
 
 # preprocess and prepare .gb files to build mmseqs datasets
@@ -50,7 +50,7 @@ rule prepare:
         SEQDIR=f"{DBDIR}/VMR_latest",
     shell:
         """
-        prepare.py {input.DATADIR} {input.XLTABLE} {params.GBDIR} {params.SEQDIR} 2> {log}
+        prepare.py {input.DATADIR} {input.XLTABLE} {params.GBDIR} {params.SEQDIR} &> {log}
         """
      
 rule make_mmseqs_proteindb:
@@ -67,9 +67,9 @@ rule make_mmseqs_proteindb:
         map=f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins_mapping"
     shell:
         """
-        mmseqs createdb --dbtype 1 {input.seqs} {output}  2> {log}
-        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  >> {log}
-        mmseqs nrtotaxmapping {input.map} {output} {params.map}  2> {log}
+        mmseqs createdb --dbtype 1 {input.seqs} {output}  &> {log}
+        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  &>> {log}
+        mmseqs nrtotaxmapping {input.map} {output} {params.map}  &>> {log}
         """
 
 rule make_mmseqs_genomedb:
@@ -86,9 +86,9 @@ rule make_mmseqs_genomedb:
         map=f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes_mapping"
     shell:
         """
-        mmseqs createdb --dbtype 0 {input.seqs} {output}  2> {log}
-        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  2> {log}
-        mmseqs nrtotaxmapping {input.map} {output} {params.map}  2> {log}
+        mmseqs createdb --dbtype 0 {input.seqs} {output}  &> {log}
+        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  &>> {log}
+        mmseqs nrtotaxmapping {input.map} {output} {params.map}  &>> {log}
         """
 
 rule make_bbmap_index:
@@ -130,11 +130,11 @@ rule make_mmseqs_profiledb:
         """
         mkdir -p {output.pclustdir} >> {log}
         mkdir -p {params.profiledir} >> {log}
-        mmseqs cluster {input.proteindb} {params.pclustdb} {params.tmp} --cluster-reassign  -s 7 2> {log}
-        mmseqs createtsv {input.proteindb} {input.proteindb} {params.pclustdb} {params.clusters_tsv} 2> {log}
-        mmseqs createsubdb {params.pclustdb}  {input.proteindb} {params.seqrep}  2> {log}
-        mmseqs createsubdb {params.pclustdb}  {params.protein_h} {params.seqrep_h}  2> {log}
-        mmseqs result2profile {params.seqrep} {input.proteindb} {params.pclustdb} {output.profiledb}  2> {log}
+        mmseqs cluster {input.proteindb} {params.pclustdb} {params.tmp} --cluster-reassign  -s 7 &> {log}
+        mmseqs createtsv {input.proteindb} {input.proteindb} {params.pclustdb} {params.clusters_tsv} &>> {log}
+        mmseqs createsubdb {params.pclustdb}  {input.proteindb} {params.seqrep}  &>> {log}
+        mmseqs createsubdb {params.pclustdb}  {params.protein_h} {params.seqrep_h}  &>> {log}
+        mmseqs result2profile {params.seqrep} {input.proteindb} {params.pclustdb} {output.profiledb}  &>> {log}
 
         """
 
@@ -147,9 +147,9 @@ rule cluster_lca:
         f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles_lca.tsv",
 
     log:
-        f"{DBDIR}/logs/prepare.log"
+        f"{DBDIR}/logs/get_cluster_lca.log"
 
     shell:
         """
-        get_cluster_lca.py {input} 2> {log}
+        get_cluster_lca.py {input} &> {log}
         """
