@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+
+"""
+author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
+
+parses the ICTV datasheet and grabs the genomes of viruses directly
+from NCBI in gb format
+
+"""
 import openpyxl
 from pathlib import Path
 from sys import argv
