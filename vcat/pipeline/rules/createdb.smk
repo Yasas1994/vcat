@@ -46,7 +46,6 @@ rule prepare:
     log:
         f"{DBDIR}/logs/prepare.log"
     params:
-    
         GBDIR=f"{DBDIR}/VMR_latest/tmp",
         SEQDIR=f"{DBDIR}/VMR_latest",
     shell:
