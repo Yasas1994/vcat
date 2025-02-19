@@ -158,7 +158,7 @@ def cal_aai(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.Ta
 def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Union[int, Exception]:
     # ps: optimized for speed not for readability
 
-    THRESHOLDS = {"genus": 0.3, "family": 0.3, "order": 0.3, "class" : 0.3, "phylum": 0.3 }
+    THRESHOLDS = {"genus": 0.1, "family": 0.1, "order": 0.1, "class" : 0.1, "phylum": 0.1}
 
     taxdb = taxopy.TaxDb(nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
                     names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
