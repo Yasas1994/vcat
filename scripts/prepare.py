@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
+
+prepares the genome and protein sequence files for mmseqs
+databse creation steps
+"""
 from ete3 import NCBITaxa
 import pandas as pd
 import numpy as np
