@@ -140,7 +140,8 @@ rule make_mmseqs_profiledb:
 
 rule cluster_lca:
     input:
-        DATADIR=DBDIR
+        DATADIR=DBDIR,
+        profiledb=f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles"
 
     output:
         f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles_lca.tsv",
