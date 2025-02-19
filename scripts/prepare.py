@@ -30,7 +30,6 @@ SEQDIR=argv[4]
 
 def extract_regions(string):
     r = [list(map(int, i)) for i in re.findall(r"\((\d+)\.{1,3}(\d+)\)", string)]
-    logger.info(r)
     return r
 
 def filter_genbank(ids):
