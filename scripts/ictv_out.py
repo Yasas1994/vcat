@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
+
+formats vcat outputs to ictv taxonomy challange result format
+"""
+
 import pandas as pd
 import numpy as np
 import taxopy
