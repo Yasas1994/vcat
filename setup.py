@@ -34,9 +34,14 @@ setup(
     # install via conda: click, pandas, pyyaml, snakemake
     entry_points={"console_scripts": ["vcat = vcat.cli:cli"]},
     classifiers=["Topic :: Scientific/Engineering :: Bio-Informatics"],
-    scripts=["scripts/download_gb.py",
-             "scripts/cluster_lca.py",
-             "scripts/postprocess.py",
+    scripts=[
+
+             "scripts/correct_profile_taxinfo.py",
+             "scripts/get_cluster_lca.py",
+             "scripts/download_gb.py",
              "scripts/ictv_out.py",
-             "scripts/prepare.py"],
+             "scripts/postprocess.py",
+             "scripts/prepare.py",
+             
+             ],
 )
