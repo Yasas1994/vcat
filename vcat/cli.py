@@ -567,7 +567,7 @@ def ani(input, header, ani, tani, qcov, all, batch):
 def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
     """
     calculates the average aminoacid identity and coverage of a query sequence 
-    to the best 
+    to the genomes in the target database
     """
     CHUNK_SIZE = batch
     file_name = os.path.basename(input)
@@ -600,6 +600,171 @@ def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
     # Remove temporary TSV files
     for file in tmp_files:
         os.remove(file)
+
+@utils.command(
+    context_settings=dict(ignore_unknown_options=True),
+    help="""
+            calculates api from mmseqs ICTV viral protein comparision results
+            and writes the results to <input>_api.tsv
+
+            output includes qcov (i.e number of genes shared between the query
+            and target over number of genes on the query),
+            api (average profile identity) and tapi (api x qcov)
+
+            usage                                                                      
+            -----                                                                      
+
+            vcat utils api  [OPTIONS] -i contigs.fasta -g configs.gff -d [DBDIR]
+
+        """,
+)
+@click.option(
+    "-i",
+    "--input",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="BLAST tabular (m8) output file",
+    required=True
+)
+@click.option(
+    "-g",
+    "--gff",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="gff file with gene cordinates of the query sequences",
+    required=True
+)
+@click.option(
+    "--header",
+    callback=parse_csv,
+    help="columnames of the m8 file ",
+    default = HEADER,
+    required=False
+)
+@click.option(
+    "--qcov",
+    type=float,
+    default=0,
+    help="filter results below this qcov cutoff",
+    required=False
+)
+@click.option(
+    "--tapi",
+    type=float,
+    default=0,
+    help="filter results below this taai cutoff",
+    required=False
+)
+@click.option(
+    "--api",
+    type=float,
+    default=0,
+    help="filter results below this aai cutoff",
+    required=False
+)
+@click.option(
+    "-d",
+    "--dbdir",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="path to the ref databases",
+    required=True
+)
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False
+)
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False
+)
+def api(input, header, api, tapi, qcov, batch, dbdir, gff):
+    """
+    calculates the average profile identity and coverage of a query sequence 
+    to the genomes in the target database
+    """
+    CHUNK_SIZE = batch
+    file_name = os.path.basename(input)
+    
+    index = index_m8(input)
+    tmp_files = []
+    with logging_redirect_tqdm():
+        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
+            finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
+            outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv")
+            status = aai_summary(finput, gff, dbdir, outfile, header)
+            if status == 0:
+                logger.info(f"{outfile} updated")
+                tmp_files.append(outfile)
+                
+            else:
+                # exit code 1
+                logger.error("error occured!")
+                logger.exception(status)
+                exit(1)
+
+    logger.info("merging temporary files")
+    tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
+    df = pl.concat([i for i in tmp if not i.is_empty()])
+    outfile = os.path.join(os.path.dirname(input),
+                           f"{file_name.split('.')[0]}{'_all' if all else ''}_api.tsv")
+    df.write_csv(outfile, separator="\t")
+    logger.info(f"{outfile} updated")
+
+    # Remove temporary TSV files
+    for file in tmp_files:
+        os.remove(file)
+
+@utils.command(
+    context_settings=dict(ignore_unknown_options=True),
+    help="""
+            subsamples nucleotide fragments from a multifasta file from a 
+            given size range
+
+            usage                                                                      
+            -----                                                                      
+
+            vcat utils fragment  [OPTIONS] -i contigs.fasta -o fragments_contig.fasta
+
+        """,
+)
+@click.option(
+    "-i",
+    "--input",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="multi fasta file",
+    required=True
+)
+@click.option(
+    "-o",
+    "--gff",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="output file with fasta fragments",
+    required=True
+)
+@click.option(
+    "--min",
+    type=int,
+    default=0.1,
+    help="minium fragement length as a percentage of the input sequence's length",
+    required=False
+)
+@click.option(
+    "--max",
+    type=int,
+    default=0.9,
+    help="maxmium fragment length as a percentage of the input sequence's length",
+    required=False
+)
+def fragment(input, header, min, max, batch, dbdir, gff):
+    """
+    generates nucleotide framents from input multi fasta file
+    """
+    pass
+
 
 cli.add_command(utils)
 
