@@ -56,7 +56,7 @@ columns = next(data)  # Extract the first row for column headers
 ictv = pd.DataFrame(data, columns=columns)
 
 ictv = ictv[ictv["Accessions Link"].notna()]
-ictv["Species"] = ictv["Species"].apply(lambda x: x.split("\"")[-2])
+ictv["Species"] = ictv["Species"].apply(lambda x: x.strip("\""))
 ictv["Taxid"] = ictv["Species"].apply(lambda x : list(ictv_tax.get_name_translator([x]).values())[0][0])
 ictv["IDS"] = ictv.apply(lambda x: x["Accessions Link"].split("\"")[1].split("/")[-1].split(","), axis=1)
   
