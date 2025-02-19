@@ -141,8 +141,8 @@ rule merge_prodigal:
     threads: 1
     shell:
         """
-        cat {input.gff} 1> {output.gff} 2>> {log}
-        cat {input.faa} 1> {output.faa} 2>> {log}
+        cat {input.gff} 1>> {output.gff} 2>> {log}
+        cat {input.faa} 1>> {output.faa} 2>> {log}
         """
 
 # Protein level annotations
@@ -175,6 +175,7 @@ rule annot_prof:
         f"{OUTDIR}/logs/{{sample}}_{{ext}}_annot_prof.log"
     params:
         db=PROFDB,
+        db_root=DBDIR,
         tmp=temp(f"{OUTDIR}/tmp"),
     threads: int(workflow.cores * 0.75)
     resources:
@@ -183,6 +184,8 @@ rule annot_prof:
         """ 
         mmseqs easy-search {input} {params.db} {output} {params.tmp} --threads {threads} -s 6 --split-memory-limit {resources.mem}\
         --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
+        
+        correct_profile_taxinfo.py {params.db_root} {output} &>> {log}
         
         """
 
