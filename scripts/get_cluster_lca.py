@@ -1,4 +1,18 @@
 #!/usr/bin/env python
+"""
+author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
+
+This script extracts taxonomic information from the cluster members (used to build a profile)
+add assigns each cluster to the lca of all members.
+
+This information is written to mmseqs_pprofiles_lca.tsv -- later used to postprocess profile-protein 
+search results
+
+mmseqs_pprofiles_lca.tsv incudes - cluster_representative (accession id), root_p1 (1st taxid above the root, usually the realm), 
+taxid (taxid of the lca of the cluster)
+
+"""
+
 import pandas as pd
 import numpy as np
 import taxopy
@@ -19,7 +33,7 @@ clust = f'{DATABASE_DIR}/VMR_latest/mmseqs_pclusters/mmseqs_pclusters.tsv'
 acc2tx = pd.read_table(acc2tx)
 acc2tx = acc2tx.drop('gi', axis=1)
 
-clusters = pd.read_table(clust, names=["cluster_rep", "cluster_mem"])
+clusters = pd.read_table(clust, names=["target", "cluster_mem"])
 
 def lca(taxa,taxdb=taxdb, fraction=0.6):
     
@@ -32,8 +46,9 @@ clusters = pd.merge(left=clusters, right=acc2tx, left_on='cluster_mem', right_on
 clusters["lineage"] = clusters.apply(lambda x : taxopy.Taxon(x['taxid'], taxdb=taxdb), axis=1)
 clusters['root_p1'] =  clusters.apply(lambda x : x["lineage"].taxid_lineage[-2], axis=1)
 
-clustlca = clusters.groupby(['cluster_rep', 'root_p1']).apply(lambda x : lca(x['lineage']), include_groups=False)
+clustlca = clusters.groupby(['target', 'root_p1']).apply(lambda x : lca(x['lineage']), include_groups=False)
+
 clustlca = pd.DataFrame(clustlca).reset_index()
-clustlca.columns = ["cluster_rep","root_p1", "taxid"]
+clustlca.columns = ["target","root_p1", "taxid"]
 
 clustlca.to_csv(f'{DATABASE_DIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles_lca.tsv', index=None, sep="\t")
