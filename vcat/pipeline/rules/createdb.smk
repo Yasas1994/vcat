@@ -151,5 +151,5 @@ rule cluster_lca:
 
     shell:
         """
-        cluster_lca.py {input} 2> {log}
+        get_cluster_lca.py {input} 2> {log}
         """
