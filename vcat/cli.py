@@ -10,7 +10,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 import polars as pl
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
-from vcat.utils import ani_summary, aai_summary, index_m8, load_chunk
+from vcat.utils import ani_summary, axi_summary, index_m8, load_chunk
 
 
 
@@ -462,8 +462,9 @@ def ani(input, header, ani, tani, qcov, all, batch):
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
             outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv")
-            status = ani_summary(finput, outfile, all=all, header=header)
-            if status == 0:
+            status = ani_summary(finput, all=all, header=header)
+            if isinstance(status, pl.DataFrame):
+                status.write_csv(outfile,  separator="\t")
                 logger.info(f"{outfile} updated")
                 tmp_files.append(outfile)
                 
@@ -523,24 +524,38 @@ def ani(input, header, ani, tani, qcov, all, batch):
     required=False
 )
 @click.option(
-    "--qcov",
+    "--tgenus",
     type=float,
-    default=0,
-    help="filter results below this qcov cutoff",
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
     required=False
 )
 @click.option(
-    "--taai",
+    "--tfamily",
     type=float,
-    default=0,
-    help="filter results below this taai cutoff",
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
     required=False
 )
 @click.option(
-    "--aai",
+    "--torder",
     type=float,
-    default=0,
-    help="filter results below this aai cutoff",
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
+    required=False
+)
+@click.option(
+    "--tclass",
+    type=float,
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
+    required=False
+)
+@click.option(
+    "--tphylum",
+    type=float,
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
     required=False
 )
 @click.option(
@@ -564,12 +579,13 @@ def ani(input, header, ani, tani, qcov, all, batch):
     help="number of records to process at a time",
     required=False
 )
-def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
+def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, gff):
     """
     calculates the average aminoacid identity and coverage of a query sequence 
     to the genomes in the target database
     """
     CHUNK_SIZE = batch
+    THRESHOLDS =  {"genus": tgenus, "family": tfamily, "order": torder, "class" : tclass, "phylum": tphylum}
     file_name = os.path.basename(input)
     
     index = index_m8(input)
@@ -578,8 +594,9 @@ def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
             outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv")
-            status = aai_summary(finput, gff, dbdir, outfile, header)
-            if status == 0:
+            status = axi_summary(finput, gff, dbdir,header, THRESHOLDS)
+            if isinstance(status, pl.DataFrame):
+                status.write_csv(outfile,  separator="\t")
                 logger.info(f"{outfile} updated")
                 tmp_files.append(outfile)
                 
@@ -640,24 +657,38 @@ def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
     required=False
 )
 @click.option(
-    "--qcov",
+    "--tgenus",
     type=float,
-    default=0,
-    help="filter results below this qcov cutoff",
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
     required=False
 )
 @click.option(
-    "--tapi",
+    "--tfamily",
     type=float,
-    default=0,
-    help="filter results below this taai cutoff",
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
     required=False
 )
 @click.option(
-    "--api",
+    "--torder",
     type=float,
-    default=0,
-    help="filter results below this aai cutoff",
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
+    required=False
+)
+@click.option(
+    "--tclass",
+    type=float,
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
+    required=False
+)
+@click.option(
+    "--tphylum",
+    type=float,
+    default=0.1,
+    help="assign sequences above this threshold to taxrank",
     required=False
 )
 @click.option(
@@ -681,12 +712,13 @@ def aai(input, header, aai, taai, qcov, batch, dbdir, gff):
     help="number of records to process at a time",
     required=False
 )
-def api(input, header, api, tapi, qcov, batch, dbdir, gff):
+def api(input, header, tgenus, tfamily, torder, tclass, tphylum, batch, dbdir, gff):
     """
     calculates the average profile identity and coverage of a query sequence 
     to the genomes in the target database
     """
     CHUNK_SIZE = batch
+    THRESHOLDS =  {"genus": tgenus, "family": tfamily, "order": torder, "class" : tclass, "phylum": tphylum}
     file_name = os.path.basename(input)
     
     index = index_m8(input)
@@ -695,8 +727,9 @@ def api(input, header, api, tapi, qcov, batch, dbdir, gff):
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
             outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv")
-            status = aai_summary(finput, gff, dbdir, outfile, header)
-            if status == 0:
+            status = axi_summary(finput, gff, dbdir, header, THRESHOLDS)
+            if isinstance(status, pl.DataFrame):
+                status.write_csv(outfile,  separator="\t")
                 logger.info(f"{outfile} updated")
                 tmp_files.append(outfile)
                 
