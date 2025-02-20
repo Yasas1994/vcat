@@ -250,7 +250,7 @@ def axi_summary(input: str, gff: str, dbdir:str, header:list, thresholds:dict) -
     except Exception as e:
         return e
 
-def index_m8(input: str) -> defaultdict[list]:
+def index_m8(input: str, kind: str) -> defaultdict[list]:
     """
     m8 files with blast results can be insanely large and may require a large amount of
     memory to load.
@@ -272,7 +272,9 @@ def index_m8(input: str) -> defaultdict[list]:
                 break
 
             line = mmapped_file[pos:end]  # Process as bytes
-            key = line.split(b"\t", 1)[0].rsplit(b"_", 1)[0]  # Extract key as bytes
+            key = line.split(b"\t", 1)[0]
+            if kind == "axi":
+                key=key.rsplit(b"_", 1)[0]  # Extract key as bytes
             index[key.decode()].append(int(pos))  # Store file offset
 
             pos = end + 1  # Move to the next line

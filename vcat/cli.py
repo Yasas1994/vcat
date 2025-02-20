@@ -456,7 +456,7 @@ def ani(input, header, ani, tani, qcov, all, batch):
     CHUNK_SIZE = batch
     file_name = os.path.basename(input)
     
-    index = index_m8(input)
+    index = index_m8(input, kind="ani")
     tmp_files = []
     with logging_redirect_tqdm():
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
@@ -588,7 +588,7 @@ def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, 
     THRESHOLDS =  {"genus": tgenus, "family": tfamily, "order": torder, "class" : tclass, "phylum": tphylum}
     file_name = os.path.basename(input)
     
-    index = index_m8(input)
+    index = index_m8(input, kind="axi")
     tmp_files = []
     with logging_redirect_tqdm():
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
@@ -721,7 +721,7 @@ def api(input, header, tgenus, tfamily, torder, tclass, tphylum, batch, dbdir, g
     THRESHOLDS =  {"genus": tgenus, "family": tfamily, "order": torder, "class" : tclass, "phylum": tphylum}
     file_name = os.path.basename(input)
     
-    index = index_m8(input)
+    index = index_m8(input, kind="axi")
     tmp_files = []
     with logging_redirect_tqdm():
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
