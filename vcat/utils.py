@@ -78,7 +78,7 @@ def compute_cov(alns: List[pl.Series]) -> float:
 
 
 # ** Process the grouped data **
-def ani_summary(infile: str, outfile: str, all:bool, header: list) -> Union[int, Exception]:
+def ani_summary(infile: str, all:bool, header: list) -> Union[pl.DataFrame, Exception]:
     try:
         mmseqs_nuc = pl.read_csv(infile,
                             has_header = False,
@@ -109,9 +109,9 @@ def ani_summary(infile: str, outfile: str, all:bool, header: list) -> Union[int,
             best_hits = output.filter(
                 pl.col("tani") == output.group_by("query").agg(pl.max("tani")).join(output, on="query")["tani"]
             )
-            best_hits.write_csv(outfile,  separator="\t")
+            return best_hits#.write_csv(outfile,  separator="\t")
         else:
-            output.write_csv(outfile,  separator="\t")
+            return output#.write_csv(outfile,  separator="\t")
 
         return 0
     except Exception as e:
@@ -133,7 +133,7 @@ def get_taxid2taxon_map(df: pl.DataFrame, taxdb: taxopy.core.TaxDb) -> dict[Orde
         tmap[x] =  taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
     return tmap
 
-def cal_aai(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb) -> tuple[pl.DataFrame, pl.Series]:
+def cal_axi(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb) -> tuple[pl.DataFrame, pl.Series]:
     tmp = df.filter(pl.col(rank) > 1).\
         group_by(["seqid",rank]).agg(
                                         ((pl.col("fident") * pl.col("alnlen")).sum()/ pl.col("alnlen").sum()).round(3).alias("aai"),
@@ -155,10 +155,10 @@ def cal_aai(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.Ta
     
     return (tmp2.rename({rank: "taxid"}), tmp.filter(pl.col('taai') < threshold)["seqid"])
 
-def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Union[int, Exception]:
+def axi_summary(input: str, gff: str, dbdir:str, header:list, thresholds:dict) -> Union[pl.DataFrame, Exception]:
     # ps: optimized for speed not for readability
 
-    THRESHOLDS = {"genus": 0.1, "family": 0.1, "order": 0.1, "class" : 0.1, "phylum": 0.1}
+    # THRESHOLDS = {"genus": 0.1, "family": 0.1, "order": 0.1, "class" : 0.1, "phylum": 0.1}
 
     taxdb = taxopy.TaxDb(nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
                     names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
@@ -241,11 +241,11 @@ def aai_summary(input: str, gff: str, dbdir:str, outfile:str, header:list) -> Un
         unmatched = mmseqs_nuc["seqid"]
         for i in ["genus", "family", "order", "class", "phylum"]:
             mmseqs_nuc_f = mmseqs_nuc.filter(pl.col("seqid").is_in(unmatched))
-            tmp, unmatched = cal_aai(mmseqs_nuc_f, rank=i, threshold=THRESHOLDS[i], taxdb=taxdb)
+            tmp, unmatched = cal_axi(mmseqs_nuc_f, rank=i, threshold=thresholds[i], taxdb=taxdb)
    
             results.append(tmp)
 
-        pl.concat(results).write_csv(outfile,  separator="\t")
+        return pl.concat(results)#.write_csv(outfile,  separator="\t")
         return 0
     except Exception as e:
         return e
