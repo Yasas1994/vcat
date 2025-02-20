@@ -18,7 +18,19 @@ import numpy as np
 import taxopy
 import os
 from sys import argv
+import logging
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Set log level
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
+    handlers=[
+        logging.StreamHandler()  # Print logs to the console
+    ]
+)
+
+# Create a logger instance
+logger = logging.getLogger("[vcat]")
 
 # You can also use your own set of taxonomy files:
 DATABASE_DIR = argv[1]

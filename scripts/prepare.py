@@ -19,7 +19,20 @@ from sys import argv
 from tqdm import tqdm
 from glob import glob
 import taxopy
-from vcat.color_logger import logger
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Set log level
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
+    handlers=[
+        logging.StreamHandler()  # Print logs to the console
+    ]
+)
+
+# Create a logger instance
+logger = logging.getLogger("[vcat]")
+
 
 # Specify the path to the custom taxdump database
 DATABASE_DIR=argv[1]  # SQLite database path

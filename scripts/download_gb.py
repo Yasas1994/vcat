@@ -14,6 +14,19 @@ import sys
 import re
 import requests
 from vcat.color_logger import logger
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Set log level
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
+    handlers=[
+        logging.StreamHandler()  # Print logs to the console
+    ]
+)
+
+# Create a logger instance
+logger = logging.getLogger("[vcat]")
 
 infile = argv[1]
 outdir = argv[2]

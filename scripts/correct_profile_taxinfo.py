@@ -14,6 +14,19 @@ import numpy as np
 import taxopy
 import shutil
 from sys import argv
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Set log level
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
+    handlers=[
+        logging.StreamHandler()  # Print logs to the console
+    ]
+)
+
+# Create a logger instance
+logger = logging.getLogger("[vcat]")
 
 DATABASE_DIR = argv[1]#'/media/ssd/ICTV-TaxonomyChallenge/vcat/databases'
 # input m8 file
