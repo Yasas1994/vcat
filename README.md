@@ -50,7 +50,7 @@ Query sequences are first compared to the nucleotide database. If matches with >
 
 - Here, pseudo ANI is defined as follows. Let, $C$ be a unknown virus contig that needs to be taxonomically annotated. Let, $G_{db}$ be a database of known virus genomes, in our case: ICTV genomes. We search $C$ agaist $G_{db}$ to retrieve all matches for $C$ in $G_{db}$. Let, $M_{db}$ be the list of genomic regions $C$ map to. $M_{db}$ may contain hits from several taxonoically related genomes and $M_{{db}_t}$ represents all regions matching to a taxonomic rank. We calculate the total length of alignmnets to each taxonomic rank and the similarity of these alignments to $C$ using,
 
-$$pseudo\text{ }ANI = \frac{\sum M_{{db}_t} \text{ }identidy}{ \sum M_{{db}_t} \text{ }alignment\text{ }length}$$
+$$\text{pseudoANI} = \frac{\sum M_{\text{db},t} \times \text{identity}}{\sum M_{\text{db},t} \times \text{alignment length}}$$
 
 2. **Protein Database Comparison:**
 For query sequences with no significant matches at the nucleotide level, open reading frames (ORFs) within the query sequence are extracted and compared to the viral protein database.
