@@ -217,13 +217,13 @@ for file in tqdm(all_files):
                     logger.info(f'{record.version.split(".")[0]}, {feature_range}')
                 else:
                     feature_range = 0, None
+                if record.sequence[feature_range[0]:feature_range[1]] != "":
+                    seq_records.append(SeqRecord(
+                                Seq(record.sequence[feature_range[0]:feature_range[1]]),
+                                id=record.accession[0],
+                                description=f'[{record.source}] {record.data_file_division}'
 
-                seq_records.append(SeqRecord(
-                            Seq(record.sequence[feature_range[0]:feature_range[1]]),
-                            id=record.accession[0],
-                            description=f'[{record.source}] {record.data_file_division}'
-
-                        ))
+                            ))
 # Write the genome sequences to a file
 with open(f'{SEQDIR}/genomes.fna', "w") as output_handle:
     SeqIO.write(seq_records, output_handle, "fasta")
