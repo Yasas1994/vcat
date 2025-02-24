@@ -150,9 +150,102 @@ def cli(obj):
     help="use at most this many jobs in parallel (see cluster submission for more details).",
 )
 @click.option(
-    "--profile",
-    default=None,
-    help="snakemake profile e.g. for cluster execution.",
+    "--tapif",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to families",
+    required=False
+)
+@click.option(
+    "--tapio",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to orders",
+    required=False
+)
+@click.option(
+    "--tapic",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to classes",
+    required=False
+)
+@click.option(
+    "--tapip",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to phyla",
+    required=False
+)
+@click.option(
+    "--tapik",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to kingdoms",
+    required=False
+)
+@click.option(
+    "--taaig",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to genera",
+    required=False
+)
+@click.option(
+    "--taaif",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to families",
+    required=False
+)
+@click.option(
+    "--taaio",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to orders",
+    required=False
+)
+@click.option(
+    "--taaic",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to classes",
+    required=False
+)
+@click.option(
+    "--taaip",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to phyla",
+    required=False
+)
+@click.option(
+    "--taaik",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to kingdoms",
+    required=False
+)
+@click.option(
+    "--ani",
+    type=float,
+    default=0.7,
+    help="filter out sequences below this ani threshold (ani)",
+    required=False
+)
+@click.option(
+    "--qcov",
+    type=float,
+    default=0.7,
+    help="filter out sequences below this qcov threshold (ani)",
+    required=False
+)
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False
 )
 @click.option(
     "-n",
@@ -164,7 +257,7 @@ def cli(obj):
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
 def contigs(
-    input, output, jobs, profile, dryrun, snakemake_args
+    input, output, jobs, batch, dryrun, snakemake_args, **kwargs
 ):
     """
     Runs vcat pipeline on contigs
@@ -173,30 +266,41 @@ def contigs(
     """
 
     logger.info(f"vcat version: {VERSION}")
-
-
     conf = load_configfile(CONFIG)
     db_dir = conf["database_dir"]
+    taai_parms = ""
+    tapi_params = ""
+    ani_params = f" --ani {kwargs['ani']} --qcov {kwargs['qcov']}"
+    for k,v in kwargs.items():
+        if k.startswith("taai"):
+            taai_parms += f" --{k} {v}"
+        elif k.startswith("tapi"):
+            tapi_params += f" --{k} {v}"
+    
 
     cmd = (
         "snakemake --snakefile {snakefile} "
-        "--jobs {jobs} --rerun-incomplete "
+        " --jobs {jobs} --rerun-incomplete "
         " --configfile {configfile} "
-        "--scheduler greedy "
+        " --scheduler greedy "
         " --show-failed-logs "
         " --groups group1=1 "
-        "--config database_dir='{db_dir}' sample='{input}' output_dir='{output}' {add_args} "
-        "{args}"
+        " --config database_dir='{db_dir}' sample='{input}' output_dir='{output}' api='{api_params}' aai='{aai_params}' ani='{ani_params}' batch='{batch}'"
+        " {args}"
     ).format(
         snakefile=get_snakefile("./pipeline/Snakefile"),
         jobs=jobs,
         configfile=CONFIG,
+        aai_params = taai_parms,
+        api_params = tapi_params,
+        ani_params = ani_params,
+        batch=batch,
         db_dir=db_dir,
         input=input,
         output=output,
-        add_args="" if snakemake_args and snakemake_args[0].startswith("-") else "--",
         args=" ".join(snakemake_args),
     )
+    logger.info(cmd)
     logger.debug("Executing: %s" % cmd)
     try:
         subprocess.check_call(cmd, shell=True)
@@ -524,38 +628,45 @@ def ani(input, header, ani, tani, qcov, all, batch):
     required=False
 )
 @click.option(
-    "--tgenus",
+    "--taaig",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this taai threshold to genera",
     required=False
 )
 @click.option(
-    "--tfamily",
+    "--taaif",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this taai threshold to families",
     required=False
 )
 @click.option(
-    "--torder",
+    "--taaio",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this taai threshold to orders",
     required=False
 )
 @click.option(
-    "--tclass",
+    "--taaic",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this taai threshold to classes",
     required=False
 )
 @click.option(
-    "--tphylum",
+    "--taaip",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this taai threshold to phyla",
+    required=False
+)
+@click.option(
+    "--taaik",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to kingdoms",
     required=False
 )
 @click.option(
@@ -573,19 +684,26 @@ def ani(input, header, ani, tani, qcov, all, batch):
     required=False
 )
 @click.option(
+    "--topk",
+    type=int,
+    default=5,
+    help="number of hits to select per query",
+    required=False
+)
+@click.option(
     "--batch",
     type=int,
     default=5000,
     help="number of records to process at a time",
     required=False
 )
-def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, gff):
+def aai(input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk):
     """
     calculates the average aminoacid identity and coverage of a query sequence 
     to the genomes in the target database
     """
     CHUNK_SIZE = batch
-    THRESHOLDS =  {"genus": tgenus, "family": tfamily, "order": torder, "class" : tclass, "phylum": tphylum}
+    THRESHOLDS =  {"genus": taaig, "family": taaif, "order": taaio, "class" : taaic, "phylum": taaip, "kingdom": taaik}
     file_name = os.path.basename(input)
     
     index = index_m8(input, kind="axi")
@@ -594,7 +712,7 @@ def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, 
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
             outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv")
-            status = axi_summary(finput, gff, dbdir,header, THRESHOLDS)
+            status = axi_summary(finput, gff, dbdir,header, THRESHOLDS, top_k=topk, kind='aai')
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile,  separator="\t")
                 logger.info(f"{outfile} updated")
@@ -610,7 +728,8 @@ def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, 
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
     outfile = os.path.join(os.path.dirname(input),
-                           f"{file_name.split('.')[0]}{'_all' if all else ''}_aai.tsv")
+                           f"{file_name.split('.')[0]}_aai.tsv")
+
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
 
@@ -657,38 +776,38 @@ def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, 
     required=False
 )
 @click.option(
-    "--tgenus",
+    "--tapif",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this tapi threshold to families",
     required=False
 )
 @click.option(
-    "--tfamily",
+    "--tapio",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this tapi threshold to orders",
     required=False
 )
 @click.option(
-    "--torder",
+    "--tapic",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this tapi threshold to classes",
     required=False
 )
 @click.option(
-    "--tclass",
+    "--tapip",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this tapi threshold to phyla",
     required=False
 )
 @click.option(
-    "--tphylum",
+    "--tapik",
     type=float,
-    default=0.1,
-    help="assign sequences above this threshold to taxrank",
+    default=0.3,
+    help="assign sequences above this tapi threshold to kingdoms",
     required=False
 )
 @click.option(
@@ -699,10 +818,10 @@ def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, 
     required=True
 )
 @click.option(
-    "--batch",
+    "--topk",
     type=int,
-    default=5000,
-    help="number of records to process at a time",
+    default=5,
+    help="number of hits to select per query",
     required=False
 )
 @click.option(
@@ -712,13 +831,14 @@ def aai(input, header, tgenus, tfamily, torder, tclass, tphylum,  batch, dbdir, 
     help="number of records to process at a time",
     required=False
 )
-def api(input, header, tgenus, tfamily, torder, tclass, tphylum, batch, dbdir, gff):
+
+def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk):
     """
     calculates the average profile identity and coverage of a query sequence 
     to the genomes in the target database
     """
     CHUNK_SIZE = batch
-    THRESHOLDS =  {"genus": tgenus, "family": tfamily, "order": torder, "class" : tclass, "phylum": tphylum}
+    THRESHOLDS =  {"family": tapif, "order": tapio, "class" : tapic, "phylum": tapip, "kingdom": tapik}
     file_name = os.path.basename(input)
     
     index = index_m8(input, kind="axi")
@@ -727,7 +847,7 @@ def api(input, header, tgenus, tfamily, torder, tclass, tphylum, batch, dbdir, g
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
             outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv")
-            status = axi_summary(finput, gff, dbdir, header, THRESHOLDS)
+            status = axi_summary(finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind='api')
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile,  separator="\t")
                 logger.info(f"{outfile} updated")
@@ -743,7 +863,7 @@ def api(input, header, tgenus, tfamily, torder, tclass, tphylum, batch, dbdir, g
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
     outfile = os.path.join(os.path.dirname(input),
-                           f"{file_name.split('.')[0]}{'_all' if all else ''}_api.tsv")
+                           f"{file_name.split('.')[0]}_api.tsv")
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
 
@@ -773,7 +893,7 @@ def api(input, header, tgenus, tfamily, torder, tclass, tphylum, batch, dbdir, g
 )
 @click.option(
     "-o",
-    "--gff",
+    "--output",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="output file with fasta fragments",
     required=True
@@ -794,7 +914,7 @@ def api(input, header, tgenus, tfamily, torder, tclass, tphylum, batch, dbdir, g
 )
 def fragment(input, header, min, max, batch, dbdir, gff):
     """
-    generates nucleotide framents from input multi fasta file
+    generates nucleotide framents from input multi fasta file (comming soon)
     """
     pass
 
