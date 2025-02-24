@@ -91,6 +91,7 @@ def ani_summary(infile: str, all:bool, header: list) -> Union[pl.DataFrame, Exce
                 pl.col("qlen").first(),
                 pl.col("tlen").first(),
                 pl.col("taxlineage").first(),
+                pl.col("taxid").first(),
                 # to do: re-implement in native api
                 pl.map_groups(exprs=["qstart", "qend", "qlen"],function=lambda df: compute_cov(df), return_dtype=pl.Float64).alias("qcov"),
                 # computes ani 
@@ -133,32 +134,41 @@ def get_taxid2taxon_map(df: pl.DataFrame, taxdb: taxopy.core.TaxDb) -> dict[Orde
         tmap[x] =  taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
     return tmap
 
-def cal_axi(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb) -> tuple[pl.DataFrame, pl.Series]:
-    tmp = df.filter(pl.col(rank) > 1).\
+def cal_axi(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb, kind:str) -> tuple[pl.DataFrame, pl.Series]:
+    tkind = f't{kind}' 
+    # print("cal axi prefilter", df['seqid'].unique().len())
+    # print("cal axi postfilter == -1", df.filter(pl.col(rank) != -1)["seqid"].unique().len())
+    # print("cal axi postfilter == -1 ", df.filter(pl.col(rank) == -1)["seqid"].unique().len())
+    # print("cal axi postfilter", df.filter(pl.col(rank) == -1 ).select(["seqid", rank ]))
+    # one seq id can have proteins mapping to different taxids
+    # only filterout targets that do not map to trank not qrank
+    tmp = df.filter(pl.col(rank) != -1).\
         group_by(["seqid",rank]).agg(
-                                        ((pl.col("fident") * pl.col("alnlen")).sum()/ pl.col("alnlen").sum()).round(3).alias("aai"),
+                                        ((pl.col("fident") * pl.col("alnlen")).sum()/ pl.col("alnlen").sum()).round(3).alias(kind),
                                         (pl.col("qlen").unique().len()/ pl.first("qlens").list.len()).round(3).alias("qcov"),
                                         pl.first("qseqlen"),
                                         pl.col("qlen").unique().len().alias("mgenes"),
                                         (pl.first("qlens").list.len()).round(3).alias("qgenes"))\
                                     .with_columns(
-                                        (pl.col("aai") * pl.col("qcov")).round(3).alias("taai"),
+                                        (pl.col(kind) * pl.col("qcov")).round(3).alias(tkind),
                                             )\
                                     .group_by("seqid")\
                                 .agg(
-                                        pl.all().sort_by('taai').last(),
+                                        pl.all().sort_by(tkind).last(),
                                         )
-    tmp2 = tmp.sort('taai').filter(pl.col('taai') >= threshold)\
+    prefilt = set(df["seqid"].unique())
+    postfilt = set(tmp.filter(pl.col(tkind) >= threshold)["seqid"].unique())
+    tmp2 = tmp.sort(tkind).filter(pl.col(tkind) >= threshold)\
     .with_columns(pl.col(rank).map_elements(lambda x : str(taxopy.Taxon(x, taxdb=taxdb)),
                                                return_dtype=str ).alias("taxlineage"))\
     .with_columns(level = pl.lit(rank))
     
-    return (tmp2.rename({rank: "taxid"}), tmp.filter(pl.col('taai') < threshold)["seqid"])
+    # return taxids with taxi < threshold and pl.col(rank) == -1
+    # tmp.filter(pl.col(tkind) < threshold)["seqid"]
+    return (tmp2.rename({rank: "taxid"}), list(prefilt - postfilt))
 
-def axi_summary(input: str, gff: str, dbdir:str, header:list, thresholds:dict) -> Union[pl.DataFrame, Exception]:
+def axi_summary(input: str, gff: str, dbdir:str, header:list, thresholds:dict, top_k:int, kind:str) -> Union[pl.DataFrame, Exception]:
     # ps: optimized for speed not for readability
-
-    # THRESHOLDS = {"genus": 0.1, "family": 0.1, "order": 0.1, "class" : 0.1, "phylum": 0.1}
 
     taxdb = taxopy.TaxDb(nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
                     names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
@@ -193,60 +203,53 @@ def axi_summary(input: str, gff: str, dbdir:str, header:list, thresholds:dict) -
                                                  return_dtype=str)).alias("query"))
     gff_df = gff_df.join(seqleninfo, on="seqid", how="inner")
 
-    mmseqs_nuc = pl.read_csv(input,
+    mmseqs_axi = pl.read_csv(input,
                             has_header = False,
                             separator="\t",
                             new_columns=header)
-    mmseqs_nuc = gff_df.select(~cs.by_name(["source", "type", "phase", "attributes"])).join(mmseqs_nuc, on="query", how="full")
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("fident").fill_null(0))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").fill_null(1))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("alnlen").fill_null(0))
+    # pick the top-k hits per query protein
+    mmseqs_axi = mmseqs_axi.group_by("query").agg(
+                            pl.all().top_k_by("fident", top_k),
+                        ).explode(pl.all().exclude("query"))
+    
+    mmseqs_axi  = gff_df.select(~cs.by_name(["source", "type", "phase", "attributes"])).join(mmseqs_axi, on="query", how="right")
+    mmseqs_axi  = mmseqs_axi.with_columns(pl.col("fident").fill_null(0))
+    mmseqs_axi  = mmseqs_axi.with_columns(pl.col("taxid").fill_null(1))
+    mmseqs_axi  = mmseqs_axi.with_columns(pl.col("alnlen").fill_null(0))
 
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x : trim_lineage(x, taxdb=taxdb),
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x : trim_lineage(x, taxdb=taxdb),
                                                            return_dtype=int))
-    taxonmap = get_taxid2taxon_map(mmseqs_nuc, taxdb=taxdb)
+    taxonmap = get_taxid2taxon_map(mmseqs_axi, taxdb=taxdb)
 
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("species", -1),
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("species", -1),
                                                             return_dtype=int).alias("species"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("genus", -1),
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("genus", -1),
                                                             return_dtype=int).alias("genus"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("family", -1),
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("family", -1),
                                                             return_dtype=int).alias("family"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("order", -1),
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("order", -1),
                                                             return_dtype=int).alias("order"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("class", -1),
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("class", -1),
                                                             return_dtype=int).alias("class"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("phylum", -1),
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("phylum", -1),
                                                             return_dtype=int).alias("phylum"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("species", -1),
-                                                            return_dtype=int).alias("species"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("genus", -1),
-                                                            return_dtype=int).alias("genus"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("family", -1),
-                                                            return_dtype=int).alias("family"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("order", -1),
-                                                            return_dtype=int).alias("order"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("class", -1),
-                                                            return_dtype=int).alias("class"))
-    mmseqs_nuc = mmseqs_nuc.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("phylum", -1),
-                                                            return_dtype=int).alias("phylum"))
-    seqid2qlens = mmseqs_nuc.group_by("seqid")\
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("kingdom", -1),
+                                                            return_dtype=int).alias("kingdom"))
+    seqid2qlens = mmseqs_axi.group_by("seqid")\
                 .agg(
                     pl.col("qlen").unique().alias("qlens")
                     )
-    mmseqs_nuc = mmseqs_nuc.join(seqid2qlens, on="seqid", how="left")
+    mmseqs_axi = mmseqs_axi.join(seqid2qlens, on="seqid", how="left")
 
     try: 
         results = []
-        unmatched = mmseqs_nuc["seqid"]
-        for i in ["genus", "family", "order", "class", "phylum"]:
-            mmseqs_nuc_f = mmseqs_nuc.filter(pl.col("seqid").is_in(unmatched))
-            tmp, unmatched = cal_axi(mmseqs_nuc_f, rank=i, threshold=thresholds[i], taxdb=taxdb)
-   
+        unmatched = mmseqs_axi["seqid"].to_list()
+        for i in list(thresholds.keys()):
+            mmseqs_nuc_f = mmseqs_axi.filter(pl.col("seqid").is_in(unmatched))
+            tmp, unmatched = cal_axi(mmseqs_nuc_f, rank=i, threshold=thresholds[i], taxdb=taxdb, kind=kind)
             results.append(tmp)
+        return pl.concat(results)
 
-        return pl.concat(results)#.write_csv(outfile,  separator="\t")
-        return 0
     except Exception as e:
         return e
 
