@@ -1,99 +1,126 @@
 #!/usr/bin/env python
-import pandas as pd
+"""
+author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
+
+postprocesses genome.m8, protein.m8 and profile.m8 files by calculating
+ani, aai, and api and summarizes the summarizes the taxonomy predictions
+to a single .tsv file
+
+"""
+import polars as pl
 import numpy as np
 import taxopy
 import pyfastx
-from sys import argv, stderr
+from sys import argv
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Set log level
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
+    handlers=[
+        logging.StreamHandler()  # Print logs to the console
+    ]
+)
+
+# Create a logger instance
+logger = logging.getLogger("[vcat]")
+
 
 DATABASE_DIR = argv[1]
 NUC = argv[2]
 PROT = argv[3]
 PROF = argv[4]
-FASTA = argv[5]
-OUTFILE = argv[6]
+OUTFILE = argv[5]
+# these should be moved to another place
+QCOV_ANI = argv[6]
+ANI = argv[7]
 
-fasta = pyfastx.Fasta(FASTA)
-headers = list(fasta.keys())
+# fasta = pyfastx.Fasta(FASTA)
+# headers = list(fasta.keys())
 
-taxdb = taxopy.TaxDb(nodes_dmp=f"{DATABASE_DIR}/ictv-taxdump/nodes.dmp",
-                     names_dmp=f"{DATABASE_DIR}/ictv-taxdump/names.dmp",
-                     merged_dmp=f"{DATABASE_DIR}/ictv-taxdump/merged.dmp")
-
-clustlca = pd.read_table(f'{DATABASE_DIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles_lca.tsv')
-clustlca['lca'] = clustlca.apply(lambda x: taxopy.Taxon(x['taxid'], taxdb), axis=1)
-
-def lca(taxa, taxdb=taxdb, fraction=0.6):
-    
-    t = taxa.to_list()
-    if len(t) > 1:
-        return taxopy.find_majority_vote(t, taxdb=taxdb, fraction=fraction)
-    return taxa.iloc[0]
-
-def trim_lineage(row, rank='class', taxdb=taxdb):
-    taxon = taxopy.Taxon(row['taxid'], taxdb=taxdb)
-    # add support for subranks in the future
-    # if sub-rank is unavailable round off the to nearest whole rank
-    ranks = ['realm','subrealm', 'kingdom', 'subkingdom','phylum','subphylum', 'class', 'subclass', 
-             'order','suborder', 'family','subfamily', 'genus','subgenus','species', 'subspecies']
-    # case one
-    if ranks.index(taxon.rank) <= ranks.index(rank):
-        return taxon, taxon.taxid, taxon.rank
-    else:
-        parent = taxon.parent(taxdb)
-        daughter = taxon
-        while parent.rank != rank and parent.rank != 'no rank' and ranks.index(parent.rank) >= ranks.index(rank):
-            daughter = parent
-            parent = parent.parent(taxdb)
-        if parent.rank != 'no rank':
-            return parent, parent.taxid, parent.rank
-        else:
-            return daughter, daughter.taxid, daughter.rank
-    
-
-## mmseqs nucleotide search against ictv genomes
-ictv_nuc=pd.read_table(NUC,
-                   names='query,target,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage'.split(","))
-
-ictv_nuc['qcov'] = ictv_nuc['alnlen']/ictv_nuc['qlen']
-
-# filter nuc results
-idx = ictv_nuc.query('qcov >= 0.85  & fident >= 0.95').groupby("query")['alnlen'].idxmax()
-ictv_nuc = ictv_nuc.iloc[idx.values]
-
-# searches against ICTV proteindb using mmseqs taxonomy
-ictv_prot=pd.read_table(PROT,
-                   names='query,taxid,trank,tname,nfrag,nlfrag,nsfrag,sfract,lineage'.split(","))
-
-ictv_prot = ictv_prot.query('tname != "unclassified"')
-ictv_prot = ictv_prot.query('taxid > 1').dropna()
+# taxdb = taxopy.TaxDb(nodes_dmp=f"{DATABASE_DIR}/ictv-taxdump/nodes.dmp",
+#                      names_dmp=f"{DATABASE_DIR}/ictv-taxdump/names.dmp",
+#                      merged_dmp=f"{DATABASE_DIR}/ictv-taxdump/merged.dmp")
 
 
-## mmseqs pprofile search against ictv genomes
-ictv_prof=pd.read_table(PROF,
-                   names='query,target,fident,pident, qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage'.split(","))
+keys = ['SequenceID', 'Realm (-viria)', 'Realm_score', 'Subrealm (-vira)',
+       'Subrealm_score', 'Kingdom (-virae)', 'Kingdom_score',
+       'Subkingdom (-virites)', 'Subkingdom_score', 'Phylum (-viricota)',
+       'Phylum_score', 'Subphylum (-viricotina)', 'Subphylum_score',
+       'Class (-viricetes)', 'Class_score', 'Subclass (-viricetidae)',
+       'Subclass_score', 'Order (-virales)', 'Order_score',
+       'Suborder (-virineae)', 'Suborder_score', 'Family (-viridae)',
+       'Family_score', 'Subfamily (-virinae)', 'Subfamily_score',
+       'Genus (-virus)', 'Genus_score', 'Subgenus (-virus)', 'Subgenus_score',
+       'Species (binomial)', 'Species_score']
 
-ictv_prof = pd.merge(left=clustlca, right=ictv_prof, right_on="target", left_on="cluster_rep")
-ictv_prof = pd.DataFrame(ictv_prof.groupby("query").apply(lambda x : lca(x['lca']), include_groups=False )).reset_index()
-ictv_prof.columns = ["query", "lca"]
-ictv_prof['taxid']= ictv_prof.apply(lambda x : x['lca'].taxid, axis=1)
-ictv_prof = ictv_prof[ictv_prof["lca"].apply(lambda x : len(x.taxid_lineage)) != 1]
+keys_full = ['SequenceID', 'Seqlen', "Score", "Method", 'Realm (-viria)', 'Realm_score', 'Subrealm (-vira)',
+       'Subrealm_score', 'Kingdom (-virae)', 'Kingdom_score',
+       'Subkingdom (-virites)', 'Subkingdom_score', 'Phylum (-viricota)',
+       'Phylum_score', 'Subphylum (-viricotina)', 'Subphylum_score',
+       'Class (-viricetes)', 'Class_score', 'Subclass (-viricetidae)',
+       'Subclass_score', 'Order (-virales)', 'Order_score',
+       'Suborder (-virineae)', 'Suborder_score', 'Family (-viridae)',
+       'Family_score', 'Subfamily (-virinae)', 'Subfamily_score',
+       'Genus (-virus)', 'Genus_score', 'Subgenus (-virus)', 'Subgenus_score',
+       'Species (binomial)', 'Species_score']
+n = [    
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+viria);?", 1).alias('Realm (-viria)'),
+    pl.lit(None).alias("Realm_score"),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+vira);", 1).alias('Subrealm (-vira)'),
+    pl.lit(None).alias('Subrealm_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+virae);?", 1).alias('Kingdom (-virae)'),
+    pl.lit(None).alias('Kingdom_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+virites);?", 1).alias('Subkingdom (-virites)'),
+    pl.lit(None).alias('Subkingdom_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+viricota);?", 1).alias('Phylum (-viricota)'),
+    pl.lit(None).alias('Phylum_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+viricotina);?", 1).alias('Subphylum (-viricotina)'),
+    pl.lit(None).alias('Subphylum_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+viricetes);?", 1).alias('Class (-viricetes)'),
+    pl.lit(None).alias('Class_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+viricetidae);?", 1).alias('Subclass (-viricetidae)'),
+    pl.lit(None).alias('Subclass_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+virales);?", 1).alias('Order (-virales)'),
+    pl.lit(None).alias('Order_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+virineae);?", 1).alias('Suborder (-virineae)'),
+    pl.lit(None).alias('Suborder_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+viridae);?", 1).alias('Family (-viridae)'),
+    pl.lit(None).alias('Family_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+virinae);?", 1).alias('Subfamily (-virinae)'),
+    pl.lit(None).alias('Subfamily_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+virus);?", 1).alias('Genus (-virus)'),
+    pl.lit(None).alias('Genus_score'),
+    pl.col("taxlineage").str.extract(r"_[A-Za-z]+virus;-_([A-Za-z]+virus);?", 1).alias('Subgenus (-virus)'),
+    pl.lit(None).alias('Subgenus_score'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+\s[A-Za-z0-9]+);?", 1).alias('Species (binomial)'),
+    pl.lit(None).alias('Species_score'),]
 
-found_in_nuc = set(ictv_nuc["query"])
-missing_in_nuc = set(headers) - found_in_nuc
-found_in_prot = missing_in_nuc.intersection(set(ictv_prot["query"]))
-missing_in_prot = set(missing_in_nuc) - set(found_in_prot)
-# filter prot
-ictv_prot = ictv_prot[ictv_prot['query'].isin(found_in_prot)]
+nuc = pl.read_csv(NUC, separator="\t")
+prot = pl.read_csv(PROT, separator="\t")
+prof = pl.read_csv(PROF, separator="\t")
 
-found_in_prof = missing_in_prot.intersection(set(ictv_prof["query"]))
-#filter prof
-ictv_prof = ictv_prof[ictv_prof['query'].isin(found_in_prof)]
+nuc = nuc.filter((pl.col('qcov') > 0.7) & (pl.col('ani') > 0.7)).group_by('query').agg(
+                        pl.all().top_k_by("tani", 1),
+                        ).explode(pl.all().exclude("query")).rename({"query":"seqid", "qlen":"qseqlen"})
 
-ictv_nuc[['lineage', 'taxid', 'trank']] = ictv_nuc.apply(lambda x : trim_lineage(x, rank="species"), axis=1, result_type="expand")
-ictv_prot[['lineage', 'taxid', 'trank']] = ictv_prot.apply(lambda x : trim_lineage(x, rank="genus"), axis=1, result_type="expand")
-ictv_prof[['lineage', 'taxid', 'trank']] = ictv_prof.apply(lambda x : trim_lineage(x, rank="family"), axis=1, result_type="expand")
+nuc = nuc.with_columns(pl.lit("ani").alias("Method")).rename({"tani": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"})
+prot = prot.with_columns(pl.lit("aai").alias("Method")).rename({"taai": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"})
+prof = prof.with_columns(pl.lit("api").alias("Method")).rename({"tapi": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"})
 
-pd.concat([ictv_nuc[['query','taxid','trank','lineage']],
-           ictv_prot[['query','taxid','trank','lineage']],
-           ictv_prof[['query','taxid','trank','lineage']]]).to_csv(OUTFILE, index=None)
+matched = nuc["SequenceID"].to_list()
+prot = prot.filter(~pl.col("SequenceID").is_in(matched))
+matched.extend(prot["SequenceID"].to_list())
+prof = prof.filter(~pl.col("SequenceID").is_in(matched))
+matched.extend(prof["SequenceID"].to_list())
 
+# write a ictv taxonomy challange formatted file - this will be removed later
+pl.concat([nuc.with_columns(*n).select(keys),
+           prot.with_columns(*n).select(keys),
+           prof.with_columns(*n).select(keys)]).write_csv(OUTFILE+".ictv", separator="\t")
+
+# write a file with more information
+pl.concat([nuc.with_columns(*n).select(keys_full),
+           prot.with_columns(*n).select(keys_full),
+           prof.with_columns(*n).select(keys_full)]).write_csv(OUTFILE, separator="\t")
