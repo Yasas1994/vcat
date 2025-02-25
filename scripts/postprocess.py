@@ -94,7 +94,7 @@ n = [
     pl.lit(None).alias('Genus_score'),
     pl.col("taxlineage").str.extract(r"_[A-Za-z]+virus;-_([A-Za-z]+virus);?", 1).alias('Subgenus (-virus)'),
     pl.lit(None).alias('Subgenus_score'),
-    pl.col("taxlineage").str.extract(r"_([A-Za-z]+\s[A-Za-z0-9]+);?", 1).alias('Species (binomial)'),
+    pl.col("taxlineage").str.extract(r"_([A-Za-z]+(?:\s[A-Za-z0-9-]+)+);?", 1).alias('Species (binomial)'),
     pl.lit(None).alias('Species_score'),]
 
 nuc = pl.read_csv(NUC, separator="\t")
