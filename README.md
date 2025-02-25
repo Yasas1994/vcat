@@ -119,6 +119,7 @@ vcat preparedb -d databases
 ```
 vcat contigs -i <input>.fasta -o outdir
 ```
+
 results can be found in the results directory within the ouput directory
 ```
 .
@@ -139,6 +140,10 @@ results can be found in the results directory within the ouput directory
 │   └── input_fasta.tsv
 └── tmp
 ```
+
+##### Expected runtime ?
+
+It takes ~4hrs to run vcat on the ICTV Taxonomy challenge dataset on a laptop computer.
 
 ---
 #### running other workflows
@@ -174,9 +179,6 @@ cat testing/gut_jaeger/nuc/gut_jaeger_virus_seqs_fasta_genome_ani.tsv | awk -F "
 
 ```
 
-##### Expected runtime ?
-
-It takes ~4hrs to run vcat on the ICTV Taxonomy challenge dataset on a laptop computer.
 
 ---
 If you use vcat please cite,
