@@ -118,7 +118,7 @@ matched.extend(prof["SequenceID"].to_list())
 # write a ictv taxonomy challange formatted file - this will be removed later
 pl.concat([nuc.with_columns(*n).select(keys),
            prot.with_columns(*n).select(keys),
-           prof.with_columns(*n).select(keys)]).write_csv(OUTFILE+".ictv", separator="\t")
+           prof.with_columns(*n).select(keys)]).write_csv(OUTFILE.rstrip(".tsv")+"_ictv.csv", separator=",")
 
 # write a file with more information
 pl.concat([nuc.with_columns(*n).select(keys_full),
