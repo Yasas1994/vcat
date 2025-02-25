@@ -1,5 +1,5 @@
 
-```
+`
 
                 XXXX       XXXX
               XXXXXXXXXXXXXXXXXXX
@@ -19,9 +19,9 @@
               XXXXXXXXXXXXXXXXXXX
                 XXXX       XXXX
 
-```
+`
 
-The Virus Contig Annotation Tool (vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for viral contigs, mapping reads to virus contigs and much more.
+The virus contig annotation Tool (vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for viral contigs, mapping reads to virus contigs and much more.
 
 #### Database Generation Pipeline
 
@@ -102,7 +102,7 @@ Commands:
 
 ---
 
-#### download and prepare the databases
+#### downloading and preparing the databases
 
 ---
 
@@ -112,15 +112,38 @@ vcat preparedb -d databases
 
 ---
 
-#### running vcat
+#### running contig annotation pipeline
 
 ---
 
 ```
-
-# run vcat contig annotation pipeline
 vcat contigs -i <input>.fasta -o outdir
+```
+results can be found in the results directory within the ouput directory
+```
+.
+├── logs
+├── nuc
+│   ├── input_genome_ani.tsv
+│   └── input_genome.m8
+├── prof
+│   ├── input_fasta_prof_api.tsv
+│   └── input_fasta_prof.m8
+├── prot
+│   ├── input_fasta.faa
+│   ├── input_fasta.gff
+│   ├── input_fasta_prot_aai.tsv
+│   └── input_fasta_prot.m8
+├── results
+│   ├── *input_fasta_ictv.csv
+│   └── input_fasta.tsv
+└── tmp
+```
 
+---
+#### running other workflows
+---
+```
 # run vcat read annotation pipeline (comming soon)
 vcat reads -i1 <reads1>.fastq [-i2 <reads2.fastq>] -o outdir
 
@@ -139,9 +162,9 @@ vcat utils visualize --phrogs -i contigs.fasta -o outdir
 # identify provirus (coming soon)
 vcat utils provirus -i contigs.fasta -o outdir
 ```
-
-##### Some additional stuff :)
-
+---
+##### Some additional stuff
+---
 ```
 # to view the contig length distribution of your contigs
 seqkit fx2tab -lg {input.fasta} | awk -F "\t" '{print $4}' | tail -n +2 | hist -b 100 -s 10
