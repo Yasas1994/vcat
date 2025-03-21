@@ -1,0 +1,37 @@
+Bootstrap: docker
+From: condaforge/miniforge3:latest
+Stage: build
+
+%files
+  ./scripts /app/scripts
+  ./vcat /app/vcat
+  ./environment.yml /app
+  ./LICENSE /app
+  ./MANIFEST.in /app
+  ./pyproject.toml /app
+  ./README.md /app
+  ./setup.py /app
+
+%post
+  #apt-get update && apt-get install -y --no-install-recommends \
+  #  build-essential \
+  #  g++ \
+  #  && apt-get clean && rm -rf /var/lib/apt/lists/*
+  conda env create -n vcat --file /app/environment.yml && \
+  conda clean --all --yes
+  conda run -n vcat pip install --root-user-action=ignore /app
+
+
+%environment
+    export TINI_SUBREAPER=1
+    export PATH=/opt/conda/bin:$PATH
+    source /opt/conda/etc/profile.d/conda.sh
+    conda activate vcat
+
+#%runscript
+    # Run script when apptainer exec or run is called
+    export SINGULARITY_SHELL=/bin/bash
+
+#%startscript
+    # Script that runs on apptainer instance start
+    # export SINGULARITY_SHELL=/bin/bash:
