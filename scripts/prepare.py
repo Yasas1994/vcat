@@ -81,7 +81,7 @@ ictv = pd.DataFrame(data, columns=columns)
 # =HYPERLINK("https://www.ncbi.nlm.nih.gov/nuccore/MH447526","NCBI Nucleotide")
 
 ictv = ictv[ictv["Accessions Link"].notna()]
-ictv["Species"] = ictv["Species"].apply(lambda x: extract_from_hyperlink(x)["display_text"])
+#ictv["Species"] = ictv["Species"].apply(lambda x: extract_from_hyperlink(x)["display_text"])
 ictv["Taxid"] = ictv["Species"].apply(lambda x : taxopy.taxid_from_name(x, taxdb)[0])
 ictv["IDS"] = ictv.apply(lambda x: extract_from_hyperlink(x["Accessions Link"])["url"].split("/")[-1].split(","), axis=1)
 ictv["Range"] = ictv.apply(lambda x: extract_regions(x["Virus GENBANK accession"] ), axis=1)
