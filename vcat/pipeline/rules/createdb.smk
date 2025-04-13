@@ -62,11 +62,12 @@ rule make_mmseqs_proteindb:
     log:
         f"{DBDIR}/logs/make_mmseqs_proteindb.log"
     params:
-        tmp=f"{DBDIR}/tmp",
+        tmp=f"{DBDIR}/tmp/pdb",
         taxdump=f"{DBDIR}/ictv-taxdump",
         map=f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins_mapping"
     shell:
         """
+        mkdir -p {params.tmp} &> {log}
         mmseqs createdb --dbtype 1 {input.seqs} {output}  &> {log}
         mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  &>> {log}
         mmseqs nrtotaxmapping {input.map} {output} {params.map}  &>> {log}
@@ -81,11 +82,12 @@ rule make_mmseqs_genomedb:
     log:
         f"{DBDIR}/logs/make_mmseqs_genomedb.log"
     params:
-        tmp=f"{DBDIR}/tmp",
+        tmp=f"{DBDIR}/tmp/gdb",
         taxdump=f"{DBDIR}/ictv-taxdump",
         map=f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes_mapping"
     shell:
         """
+        mkdir -p {params.tmp} &> {log}
         mmseqs createdb --dbtype 0 {input.seqs} {output}  &> {log}
         mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  &>> {log}
         mmseqs nrtotaxmapping {input.map} {output} {params.map}  &>> {log}
@@ -118,16 +120,29 @@ rule make_mmseqs_profiledb:
     log:
         f"{DBDIR}/logs/make_mmseqs_profiledb.log"
     params:
-        tmp=f"{DBDIR}/tmp",
+        tmp=f"{DBDIR}/tmp/pfdb",
         pclustdb=f"{DBDIR}/VMR_latest/mmseqs_pclusters/mmseqs_pclusters",
         clusters_tsv=f"{DBDIR}/VMR_latest/mmseqs_pclusters/mmseqs_pclusters.tsv",
         profiledir=f"{DBDIR}/VMR_latest/mmseqs_pprofiles",
+        pclustdir=f"{DBDIR}/VMR_latest/mmseqs_pclusters",
         seqrep=f"{DBDIR}/VMR_latest/mmseqs_pclusters/sequenceRepDb",
         seqrep_h=f"{DBDIR}/VMR_latest/mmseqs_pclusters/sequenceRepDb_h",
         protein_h=f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins_h",
+        pclust_lookup='./sequenceRepDb.lookup',
+        pclust_mapping='./sequenceRepDb_mapping',
+        pclust_source='./sequenceRepDb.source',
+        pclust_taxonomy= './sequenceRepDb_taxonomy',
+        pprof_lookup='./sequenceRepDb.lookup',
+        pprof_mapping='./sequenceRepDb_mapping',
+        pprof_source='./sequenceRepDb.source',
+        pprof_taxonomy='./sequenceRepDb_taxonomy',
+        pprof_pprofiles_h = './mmseqs_pprofiles_h',
+        pprof_pprofiles_h_dbtype = './mmseqs_pprofiles_h.dbtype',
+        pprof_pprofiles_h_index = './mmseqs_pprofiles_h.index'
         
     shell:
         """
+        mkdir -p {params.tmp} &> {log}
         mkdir -p {output.pclustdir} >> {log}
         mkdir -p {params.profiledir} >> {log}
         mmseqs cluster {input.proteindb} {params.pclustdb} {params.tmp} --cluster-reassign  -s 7 &> {log}
@@ -135,8 +150,21 @@ rule make_mmseqs_profiledb:
         mmseqs createsubdb {params.pclustdb}  {input.proteindb} {params.seqrep}  &>> {log}
         mmseqs createsubdb {params.pclustdb}  {params.protein_h} {params.seqrep_h}  &>> {log}
         mmseqs result2profile {params.seqrep} {input.proteindb} {params.pclustdb} {output.profiledb}  &>> {log}
-
+        cd {params.pclustdir} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins.lookup {params.pclust_lookup}  &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins_mapping {params.pclust_mapping}  &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins.source {params.pclust_source} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins_taxonomy {params.pclust_taxonomy} &>> {log}
+        cd {params.profiledir} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins.lookup {params.pprof_lookup} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins_mapping {params.pprof_mapping} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins.source {params.pprof_source} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins_taxonomy {params.pprof_taxonomy} &>> {log}
+        ln -sf ../mmseqs_pclusters/sequenceRepDb_h {params.pprof_pprofiles_h} &>> {log}
+        ln -sf  ../mmseqs_pclusters/sequenceRepDb_h.dbtype {params.pprof_pprofiles_h_dbtype} &>> {log}
+        ln -sf ../mmseqs_pclusters/sequenceRepDb_h.index {params.pprof_pprofiles_h_index} &>> {log}
         """
+
 
 rule cluster_lca:
     input:

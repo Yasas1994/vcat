@@ -86,7 +86,7 @@ rule annot_nuc:
         f"{OUTDIR}/logs/{{sample}}_{{ext}}_annot_nuc.log"
     params:
         db=GENOMEDB,
-        tmp=temp(f"{OUTDIR}/tmp"),
+        tmp=temp(f"{OUTDIR}/tmp/nuc"),
     threads: int(workflow.cores * 0.75)
     shell:
         """
@@ -163,7 +163,7 @@ rule annot_prot:
         f"{OUTDIR}/logs/{{sample}}_{{ext}}_annot_prot.log"
     params:
         db=PROTDB,
-        tmp=temp(f"{OUTDIR}/tmp"),
+        tmp=temp(f"{OUTDIR}/tmp/prot"),
     threads: int(workflow.cores * 0.75)
     resources:
         mem='30G'
@@ -184,7 +184,7 @@ rule annot_prof:
     params:
         db=PROFDB,
         db_root=DBDIR,
-        tmp=temp(f"{OUTDIR}/tmp"),
+        tmp=temp(f"{OUTDIR}/tmp/prof"),
     threads: int(workflow.cores * 0.75)
     resources:
         mem='30G'

@@ -5,9 +5,7 @@ import os
 import sys
 import yaml
 import polars as pl
-from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
-import polars as pl
+from pathlib import Path
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 from vcat.utils import ani_summary, axi_summary, index_m8, load_chunk
@@ -24,14 +22,25 @@ def parse_csv(ctx, param, value):
         return value.split(",")
     return []
 
+def format_databases(config):
+    default_url = ""
+    default = ""
+    choices = []
+    for i in config['downloads']:
+        choices.append(i.get("name"))
+        if i.get("latest"):
+            default += i.get("name")
+            default_url += i.get("link")
+    return default, choices, default_url
+
 from .color_logger import logger
 
 # Define the directory containing the pipeline files
 PIPELINE_DIR = os.path.join(os.path.dirname(__file__), "./pipeline")
-VERSION = "0.0.1a"
+VERSION = "0.0.1b"
 CONFIG = os.path.join(PIPELINE_DIR, "config.yaml")
 HEADER = "query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage"
-
+CONFIG_CONTENT = yaml.safe_load(open(CONFIG, "r"))
 def handle_max_mem(max_mem, profile):
     "Specify maximum virtual memory to use by atlas."
     "For numbers >1 its the memory in GB. "
@@ -140,6 +149,13 @@ def cli(obj):
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="dir to store vcat results",
     required=True,
+)
+@click.option(
+    "-d",
+    "--database",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="dir to vcat database",
+    required=False,
 )
 @click.option(
     "-j",
@@ -257,7 +273,7 @@ def cli(obj):
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
 def contigs(
-    input, output, jobs, batch, dryrun, snakemake_args, **kwargs
+    input, output, database, jobs, batch, dryrun, snakemake_args, **kwargs
 ):
     """
     Runs vcat pipeline on contigs
@@ -267,7 +283,10 @@ def contigs(
 
     logger.info(f"vcat version: {VERSION}")
     conf = load_configfile(CONFIG)
-    db_dir = conf["database_dir"]
+    if database:
+        db_dir = database
+    else:
+        db_dir = conf["database_dir"]
     taai_parms = ""
     tapi_params = ""
     ani_params = f" --ani {kwargs['ani']} --qcov {kwargs['qcov']}"
@@ -400,7 +419,7 @@ def reads(
         logger.critical(e)
         exit(1)
 
-# Download
+# Download and build
 @cli.command(
     context_settings=dict(ignore_unknown_options=True),
     short_help="download and build reference databases",
@@ -477,6 +496,57 @@ def preparedb(db_dir, jobs, snakemake_args):
     logger.info(f"Adding {db_dir} to config.yaml")
     update_config(config_path=CONFIG, data={"database_dir" :db_dir})
 
+# Download pre-built from server
+default_db, choices, default_url = format_databases(config=CONFIG_CONTENT)
+@cli.command(
+    context_settings=dict(ignore_unknown_options=True),
+    short_help="pull pre-built databases from a remote server",
+)
+@click.option(
+    "-d",
+    "--db-dir",
+    help="location to store databases",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--dbversion",
+    default=default_db,
+    type=click.Choice(choices, case_sensitive=False),
+    show_default=True,
+    help=f"version of the database to download",
+)
+@click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
+def downloaddb(db_dir, dbversion, snakemake_args):
+    "pull pre-built databases from a remote server"
+
+    logger.info(f"downloading {dbversion} database from remote server")
+    cmd = (
+        "snakemake --snakefile {snakefile} "
+        " --rerun-incomplete "
+        " --configfile {configfile} "
+        "--scheduler greedy "
+        " --show-failed-logs "
+        "--config database_dir='{db_dir}' dbversion='{dbversion}' dburl='{dburl}' {add_args} "
+        "{args}"
+    ).format(
+        snakefile=get_snakefile("./pipeline/rules/download.smk"),
+        configfile=CONFIG,
+        db_dir=db_dir,
+        dbversion=dbversion,
+        dburl=default_url,
+        add_args="" if snakemake_args and snakemake_args[0].startswith("-") else "--",
+        args=" ".join(snakemake_args),
+    )
+    try:
+        subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as e:
+        # removes the traceback
+        logger.critical(e)
+        exit(1)
+
+    logger.info(f"Adding {db_dir} to config.yaml")
+    update_config(config_path=CONFIG, data={"database_dir" : str(Path(db_dir) / dbversion)})
 
 # utility functions
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
