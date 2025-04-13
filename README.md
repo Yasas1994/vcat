@@ -23,7 +23,16 @@
 
 The virus contig annotation Tool (vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for viral contigs, mapping reads to virus contigs and much more.
 
-#### Database Generation Pipeline
+### Changelog
+---
+<b>0.0.2</b>
+* added downloaddb commad to download pre-built databases (VMR_40v1 and VMR_39v4)
+* added a definition file to build Apptainer containers
+* added subroutines to clean up tmp files generated duting the database build
+
+---
+
+### Database Generation Pipeline
 
 The pipeline automates the creation of comprehensive viral nucleotide, protein, and profile databases. The database generation process includes the following steps:
 
@@ -41,7 +50,7 @@ Viral proteins are clustered, and these clusters are converted into a protein pr
 
 ---
 
-#### Contig Annotation Pipeline
+### Virus Contig Annotation Pipeline
 
 `vcat` annotates viral contigs by sequentially comparing query sequences against the nucleotide, protein, and profile databases uisng `mmseqs2`. The annotation process follows these steps:
 
@@ -67,7 +76,7 @@ Sequences that remain unannotated at the protein level are then compared to the 
 
 ---
 
-#### how to install?
+### how to install? (conda)
 
 ```
 git clone https://github.com/Yasas1994/vcat.git
@@ -94,25 +103,64 @@ Options:
 
 Commands:
   contigs    run contig annotation workflow
+  downloaddb download pre-built reference databases
   preparedb  download and build reference databases
   reads      run read annotation workflow
   utils      tool chain for calculating ani, aai and visualizations
 
 ```
+### Singularity (Now Apptainer)
+
+```
+git clone https://github.com/Yasas1994/vcat.git
+cd vcat
+
+# build container
+apptainer build vcat.sif Apptainer
+
+# test the container build
+apptainer run vcat.sif vcat --help
+
+Usage: vcat [OPTIONS] COMMAND [ARGS]...
+
+  vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus
+  contigs, mapping reads to virus genomes and much more.
+  (https://github.com/Yasas1994/vcat)
+
+Options:
+  --version   Show the version and exit.
+  -h, --help  Show this message and exit.
+
+Commands:
+  contigs    run contig annotation workflow
+  downloaddb download pre-built reference databases
+  preparedb  download sequences and build reference databases
+  reads      run read annotation workflow
+  utils      tool chain for calculating ani, aai and visualizations
+
+```
+---
+### downloading pre-built databases
+---
+
+```
+# pulling pre-built databases from remote server [vmr39v and vmr40v1]
+vcat downloaddb --dbversion vmr39v4 -d <path to save the database>
+```
 
 ---
 
-#### downloading and preparing the databases
+### downloading and preparing the databases
 
 ---
 
 ```
-vcat preparedb -d databases
+vcat preparedb -d <path to save the database>
 ```
 
 ---
 
-#### running contig annotation pipeline
+### running contig annotation pipeline
 
 ---
 
@@ -141,12 +189,12 @@ results can be found in the results directory within the ouput directory
 └── tmp
 ```
 
-##### Expected runtime ?
+#### Expected runtime ?
 
 It takes ~4hrs to run vcat on the ICTV Taxonomy challenge dataset on a laptop computer.
 
 ---
-#### running other workflows
+### running other workflows
 ---
 ```
 # run vcat read annotation pipeline (comming soon)
@@ -168,7 +216,7 @@ vcat utils visualize --phrogs -i contigs.fasta -o outdir
 vcat utils provirus -i contigs.fasta -o outdir
 ```
 ---
-##### Some additional stuff
+#### Some additional stuff
 ---
 ```
 # to view the contig length distribution of your contigs
