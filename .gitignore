@@ -11,3 +11,4 @@ databases/*
 example/*
 meta/*
 vcat.egg-info/*
+vcat_dev/*
