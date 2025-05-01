@@ -635,7 +635,7 @@ def ani(input, header, ani, tani, qcov, all, batch):
     with logging_redirect_tqdm():
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
-            outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv")
+            outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv")
             status = ani_summary(finput, all=all, header=header)
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile,  separator="\t")
@@ -651,7 +651,7 @@ def ani(input, header, ani, tani, qcov, all, batch):
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
-    outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_ani.tsv")
+    outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv")
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
 
@@ -781,7 +781,7 @@ def aai(input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, g
     with logging_redirect_tqdm():
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
-            outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv")
+            outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv")
             status = axi_summary(finput, gff, dbdir,header, THRESHOLDS, top_k=topk, kind='aai')
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile,  separator="\t")
@@ -798,7 +798,7 @@ def aai(input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, g
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
     outfile = os.path.join(os.path.dirname(input),
-                           f"{file_name.split('.')[0]}_aai.tsv")
+                           f"{os.path.splitext(file_name)[0]}_aai.tsv")
 
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
@@ -916,7 +916,7 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     with logging_redirect_tqdm():
         for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
             finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
-            outfile = os.path.join(os.path.dirname(input), f"{file_name.split('.')[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv")
+            outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv")
             status = axi_summary(finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind='api')
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile,  separator="\t")
@@ -933,7 +933,7 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
     outfile = os.path.join(os.path.dirname(input),
-                           f"{file_name.split('.')[0]}_api.tsv")
+                           f"{os.path.splitext(file_name)[0]}_api.tsv")
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
 
