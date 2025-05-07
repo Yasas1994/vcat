@@ -31,8 +31,9 @@ rule decompress:
         f"{DBDIR}/{DBVER}.tar.gz"
     output:
         f"{DBDIR}/{DBVER}/.done"
-
+    params:
+        outdir = DBDIR
     shell:
         """
-        tar -xf {input} && touch {output}
+        tar -xf {input} -C {params.outdir} && touch {output}
         """

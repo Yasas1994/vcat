@@ -136,6 +136,10 @@ rule make_mmseqs_profiledb:
         pprof_mapping='./sequenceRepDb_mapping',
         pprof_source='./sequenceRepDb.source',
         pprof_taxonomy='./sequenceRepDb_taxonomy',
+        pprof_lookup_='./mmseqs_pprofiles.lookup',
+        pprof_mapping_='./mmseqs_pprofiles_mapping',
+        pprof_source_='./mmseqs_pprofiles.source',
+        pprof_taxonomy_='./mmseqs_pprofiles_taxonomy',
         pprof_pprofiles_h = './mmseqs_pprofiles_h',
         pprof_pprofiles_h_dbtype = './mmseqs_pprofiles_h.dbtype',
         pprof_pprofiles_h_index = './mmseqs_pprofiles_h.index'
@@ -160,6 +164,10 @@ rule make_mmseqs_profiledb:
         ln -sf ../mmseqs_proteins/mmseqs_proteins_mapping {params.pprof_mapping} &>> {log}
         ln -sf ../mmseqs_proteins/mmseqs_proteins.source {params.pprof_source} &>> {log}
         ln -sf ../mmseqs_proteins/mmseqs_proteins_taxonomy {params.pprof_taxonomy} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins.lookup {params.pprof_lookup_} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins_mapping {params.pprof_mapping_} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins.source {params.pprof_source_} &>> {log}
+        ln -sf ../mmseqs_proteins/mmseqs_proteins_taxonomy {params.pprof_taxonomy_} &>> {log}
         ln -sf ../mmseqs_pclusters/sequenceRepDb_h {params.pprof_pprofiles_h} &>> {log}
         ln -sf  ../mmseqs_pclusters/sequenceRepDb_h.dbtype {params.pprof_pprofiles_h_dbtype} &>> {log}
         ln -sf ../mmseqs_pclusters/sequenceRepDb_h.index {params.pprof_pprofiles_h_index} &>> {log}
