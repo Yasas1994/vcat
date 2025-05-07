@@ -36,4 +36,5 @@ rule decompress:
     shell:
         """
         tar -xf {input} -C {params.outdir} && touch {output}
+        rm {input}
         """
