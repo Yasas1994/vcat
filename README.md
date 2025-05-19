@@ -59,9 +59,9 @@ Query sequences are first compared to the nucleotide database. If matches with >
 
 - Here, taxo ANI is defined as follows. Let, $C$ be a unknown virus contig that needs to be taxonomically annotated. Let, $G_{db}$ be a database of known virus genomes, in our case: ICTV genomes. We search $C$ agaist $G_{db}$ to retrieve all matches for $C$ in $G_{db}$. Let, $M_{db}$ be the list of genomic regions $C$ map to. $M_{db}$ may contain hits from several taxonoically related genomes and $M_n$ represents all regions matching to a taxonomic rank. We calculate the total length of alignmnets to each taxonomic rank and the similarity of these alignments to $C$ using,
 
-$$taxo\text{ }ANI = \frac{\sum_{i=1}^{M_n} talnlen_i\times fidentity_i}{\sum_i talnlen_i} \text{ where} ,\\
-talnlen_i = \text{length of the alignment } i \text{ between } C \text{ and } G_db\\
-tfident_i = \text{identity of the alignment } i \text{ between } C \text{ and } G_db\\
+$$taxo\text{ }ANI = \frac{\sum_{i=1}^{M_n} talnlen_i\times fidentity_i}{\sum_i talnlen_i} \text{ where}$$
+$$talnlen_i = \text{length of the alignment } i \text{ between } C \text{ and } G_db$$
+$$tfident_i = \text{identity of the alignment } i \text{ between } C \text{ and } G_db
 $$
 
 2. **Protein Database Comparison:**
@@ -69,9 +69,9 @@ For query sequences with no significant matches at the nucleotide level, open re
 
 - Here, taxo AAI is defined as follows. Extending the definitions from the above section, let $P_c$ be a list of genes (ORFs) on $C$. Let $P_{db}$ be a database of viral proteins from ICTV genomes. $P_{db}$ is searched for matches to the ORFs found in $C$, denoted as $C_{ORF}$. Let $P_m \subseteq P_c$ represent the subset of ORFs from $C$ that have a significant match in $P_{db}$. $I_{m_i}$ is the amino acid identity between the $i$-th matched ORF in $P_m$ and its corresponding hit in $P_{db}$. The taxonomic average amino acid identity is calculated as:
 
-$$ taxo\text{ }AAI = \frac{1}{n}\sum_{i}^{n}I_{m_{i}} \text{ where,}\\
-n = |P_m|, \text{ the number of ORFs with matches}\\
-I_{m_i} = \text{amino acid identity of matched ORF } i \text{ between } C \text{ and } P_{db}
+$$ taxo\text{ }AAI = \frac{1}{n}\sum_{i}^{n}I_{m_{i}} \text{ where,}$$
+$$n = |P_m|, \text{ the number of ORFs with matches}$$
+$$I_{m_i} = \text{amino acid identity of matched ORF } i \text{ between } C \text{ and } P_{db}
 $$
 
 
@@ -80,9 +80,9 @@ $$
 - Here, taxo API is calculated similarly to taxo AAI, except the target database is a protein profile (HMM) database instead of a protein sequence database. Let $H_{db}$ be the profile HMM database derived from ICTV viral protein families. Let $H_m$ represent the subset of ORFs from $C$ that match to profiles in $H_{db}$. Let $S_{m_i}$ be the percent sequence identity (or bit-score-normalized identity, depending on implementation) between the $i$-th ORF and its matched profile.
 
 $$
-\text{taxo API} = \frac{1}{n} \sum_{i=1}^{n} S_{m_i} \text{ where,}\\
-n = |H_m|, \text{ the number of ORFs with profile matches }\\
-S_{m_i} = \text{similarity score between ORF} i \text{ in } C \text{ and its matched profile in } H_{db}
+\text{taxo API} = \frac{1}{n} \sum_{i=1}^{n} S_{m_i} \text{ where,}$$
+$$n = |H_m|, \text{ the number of ORFs with profile matches }$$
+$$S_{m_i} = \text{similarity score between ORF} i \text{ in } C \text{ and its matched profile in } H_{db}
 $$
 
 ---
