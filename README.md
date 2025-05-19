@@ -77,12 +77,11 @@ $$
 
 3. **Profile Database Comparison:** Sequences that remain unannotated at the protein level are compared to a protein profile (HMM) database to provide taxonomic annotations.
 
-- Here, pseudo API is calculated similarly to taxo AAI, except the target database is a protein profile (HMM) database instead of a protein sequence database. Let $H_{db}$ be the profile HMM database derived from ICTV viral protein families. Let $H_m$ represent the subset of ORFs from $C$ that match to profiles in $H_{db}$. Let $S_{m_i}$ be the percent sequence identity (or bit-score-normalized identity, depending on implementation) between the $i$-th ORF and its matched profile.
+- Here, taxo API is calculated similarly to taxo AAI, except the target database is a protein profile (HMM) database instead of a protein sequence database. Let $H_{db}$ be the profile HMM database derived from ICTV viral protein families. Let $H_m$ represent the subset of ORFs from $C$ that match to profiles in $H_{db}$. Let $S_{m_i}$ be the percent sequence identity (or bit-score-normalized identity, depending on implementation) between the $i$-th ORF and its matched profile.
 
 $$
-\text{pseudo API} = \frac{1}{n} \sum_{i=1}^{n} S_{m_i} \text{ where,}\\
-n = |H_m|, \text{ the number of ORFs with profile matches}\\
-
+\text{taxo API} = \frac{1}{n} \sum_{i=1}^{n} S_{m_i} \text{ where,}\\
+n = |H_m|, \text{ the number of ORFs with profile matches }\\
 S_{m_i} = \text{similarity score between ORF} i \text{ in } C \text{ and its matched profile in } H_{db}
 $$
 
