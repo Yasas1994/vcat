@@ -100,7 +100,7 @@ git clone https://github.com/Yasas1994/vcat.git
 cd vcat
 
 # create a conda env
- mamba env create -f environment.yml
+ mamba create -f environment.yml
 
 # install vcat pipeline
 pip install .
@@ -161,8 +161,8 @@ Commands:
 ---
 
 ```
-# pulling pre-built databases from remote server [vmr39v and vmr40v1]
-vcat downloaddb --dbversion vmr39v4 -d <path to save the database>
+# pulling pre-built databases from remote server [msl39v and masl40v1]
+vcat downloaddb --dbversion masl39v4 -d <path to save the database> --cores 1
 ```
 
 ---
