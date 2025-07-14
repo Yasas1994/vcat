@@ -7,10 +7,10 @@ parses the ICTV datasheet and grabs the genomes of viruses directly
 from NCBI in gb format
 
 """
+
 import openpyxl
 from pathlib import Path
 from sys import argv
-import sys
 import re
 import requests
 from vcat.color_logger import logger
@@ -22,7 +22,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
     handlers=[
         logging.StreamHandler()  # Print logs to the console
-    ]
+    ],
 )
 
 # Create a logger instance
@@ -40,7 +40,6 @@ directory = Path(outdir)
 directory.mkdir(parents=True, exist_ok=True)
 
 
-
 # NCBI EFetch API URL for FASTA format
 base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
@@ -49,40 +48,37 @@ sheets = wb.sheetnames
 ws = wb[sheets[1]]
 headers = [cell.value for cell in ws[1]]
 
-dlink = 'Accessions Link'
-virus_names = 'Virus name(s)'
+dlink = "Accessions Link"
+virus_names = "Virus name(s)"
 num_links = 0
 all_ids = []
 with open(f"{DBDIR}/ID.list", "w") as fh:
     # Iterate through the cells in the last column
     for row in range(2, ws.max_row + 1):  # Iterate through all rows
-        names = ws.cell(row=row, column=headers.index(virus_names)+1)
-        tmp = "" if None == names.value else names.value
-        if 'gene transfer agent' not in tmp:
-            cell = ws.cell(row=row, column=headers.index(dlink)+1)
+        names = ws.cell(row=row, column=headers.index(virus_names) + 1)
+        tmp = "" if None is names.value else names.value
+        if "gene transfer agent" not in tmp:
+            cell = ws.cell(row=row, column=headers.index(dlink) + 1)
             if cell.value:
-                link = cell.value.split("\"")[1]
+                link = cell.value.split('"')[1]
                 match = re.search(pattern, link)
                 if match:
                     num_links += 1
-                
 
                     # Extract sequence IDs from the URL
                     ids = link.split("/")[-1]
-                    fh.write(ids+"\n")
+                    fh.write(ids + "\n")
                     all_ids.extend(ids.split("(")[0].split(","))
-
 
 
 for i in range(0, len(all_ids), 200):
     # API parameters
     params = {
-        "db": "nuccore",       # Nucleotide database
-        "id": ",".join(all_ids[i:i+200]),             # Sequence IDs
-        "rettype": "gb",    # Return type
-        "retmode": "text"      # Return mode
+        "db": "nuccore",  # Nucleotide database
+        "id": ",".join(all_ids[i : i + 200]),  # Sequence IDs
+        "rettype": "gb",  # Return type
+        "retmode": "text",  # Return mode
     }
-
 
     # Send the request
     response = requests.get(base_url, params=params)
@@ -94,7 +90,9 @@ for i in range(0, len(all_ids), 200):
             file.write(response.text)
         logger.info(f"FASTA file downloaded successfully as sequences_{i}_{i+200}.gb")
     else:
-        logger.info(f"Failed to retrieve data. HTTP Status Code: {response.status_code}")
+        logger.info(
+            f"Failed to retrieve data. HTTP Status Code: {response.status_code}"
+        )
 
 
 open(f"{DBDIR}/download_complete", "w").close()

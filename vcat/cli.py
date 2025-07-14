@@ -9,12 +9,13 @@ from pathlib import Path
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 from vcat.utils import ani_summary, axi_summary, index_m8, load_chunk
-
+from .color_logger import logger
 
 
 def load_configfile(file_path):
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         return yaml.safe_load(f)
+
 
 def parse_csv(ctx, param, value):
     """Split the comma-separated input into a list."""
@@ -22,18 +23,19 @@ def parse_csv(ctx, param, value):
         return value.split(",")
     return []
 
+
 def format_databases(config):
     default_url = ""
     default = ""
     choices = []
-    for i in config['downloads']:
+    for i in config["downloads"]:
         choices.append(i.get("name"))
         if i.get("latest"):
             default += i.get("name")
             default_url += i.get("link")
     return default, choices, default_url
 
-from .color_logger import logger
+
 
 # Define the directory containing the pipeline files
 PIPELINE_DIR = os.path.join(os.path.dirname(__file__), "./pipeline")
@@ -41,6 +43,8 @@ VERSION = "0.0.1b"
 CONFIG = os.path.join(PIPELINE_DIR, "config.yaml")
 HEADER = "query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage"
 CONFIG_CONTENT = yaml.safe_load(open(CONFIG, "r"))
+
+
 def handle_max_mem(max_mem, profile):
     "Specify maximum virtual memory to use by atlas."
     "For numbers >1 its the memory in GB. "
@@ -83,8 +87,8 @@ def get_snakefile(file=f"{PIPELINE_DIR }/Snakefile"):
         sys.exit("Unable to locate the Snakemake workflow file; tried %s" % sf)
     return sf
 
-def update_config(config_path, data:dict):
 
+def update_config(config_path, data: dict):
     import yaml
 
     # Step 1: Read the YAML file
@@ -92,15 +96,12 @@ def update_config(config_path, data:dict):
         config = yaml.safe_load(file)  # Load the YAML into a Python dictionary
 
     # Step 2: Update the configuration
-    for k,v in data.items():
+    for k, v in data.items():
         config[k] = v
-
 
     # Step 3: Write back to the YAML file
     with open(config_path, "w") as file:
         yaml.safe_dump(config, file, default_flow_style=False)
-
-
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -112,6 +113,7 @@ def cli(obj):
     mapping reads to virus genomes and much more.
     (https://github.com/Yasas1994/vcat)"""
     pass
+
 
 @cli.command(
     context_settings=dict(ignore_unknown_options=True),
@@ -170,98 +172,98 @@ def cli(obj):
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to families",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapio",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to orders",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapic",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to classes",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapip",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to phyla",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapik",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to kingdoms",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaig",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to genera",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaif",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to families",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaio",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to orders",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaic",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to classes",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaip",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to phyla",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaik",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to kingdoms",
-    required=False
+    required=False,
 )
 @click.option(
     "--ani",
     type=float,
     default=0.7,
     help="filter out sequences below this ani threshold (ani)",
-    required=False
+    required=False,
 )
 @click.option(
     "--qcov",
     type=float,
     default=0.7,
     help="filter out sequences below this qcov threshold (ani)",
-    required=False
+    required=False,
 )
 @click.option(
     "--batch",
     type=int,
     default=5000,
     help="number of records to process at a time",
-    required=False
+    required=False,
 )
 @click.option(
     "-n",
@@ -272,9 +274,7 @@ def cli(obj):
     help="Test execution.",
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
-def contigs(
-    input, output, database, jobs, batch, dryrun, snakemake_args, **kwargs
-):
+def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwargs):
     """
     Runs vcat pipeline on contigs
 
@@ -290,12 +290,11 @@ def contigs(
     taai_parms = ""
     tapi_params = ""
     ani_params = f" --ani {kwargs['ani']} --qcov {kwargs['qcov']}"
-    for k,v in kwargs.items():
+    for k, v in kwargs.items():
         if k.startswith("taai"):
             taai_parms += f" --{k} {v}"
         elif k.startswith("tapi"):
             tapi_params += f" --{k} {v}"
-    
 
     cmd = (
         "snakemake --snakefile {snakefile} "
@@ -310,9 +309,9 @@ def contigs(
         snakefile=get_snakefile("./pipeline/Snakefile"),
         jobs=jobs,
         configfile=CONFIG,
-        aai_params = taai_parms,
-        api_params = tapi_params,
-        ani_params = ani_params,
+        aai_params=taai_parms,
+        api_params=tapi_params,
+        ani_params=ani_params,
         batch=batch,
         db_dir=db_dir,
         input=input,
@@ -327,6 +326,7 @@ def contigs(
         # removes the traceback
         logger.critical(e)
         exit(1)
+
 
 @cli.command(
     context_settings=dict(ignore_unknown_options=True),
@@ -377,9 +377,7 @@ def contigs(
     help="Test execution.",
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
-def reads(
-    input, output, jobs, profile, dryrun, snakemake_args
-):
+def reads(input, output, jobs, profile, dryrun, snakemake_args):
     """
     Runs vcat pipeline on reads
 
@@ -387,7 +385,6 @@ def reads(
     """
 
     logger.info(f"vcat version: {VERSION}")
-
 
     conf = load_configfile(CONFIG)
     db_dir = conf["database_dir"]
@@ -419,6 +416,7 @@ def reads(
         logger.critical(e)
         exit(1)
 
+
 # Download and build
 @cli.command(
     context_settings=dict(ignore_unknown_options=True),
@@ -441,8 +439,7 @@ def reads(
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
 def preparedb(db_dir, jobs, snakemake_args):
-    """Executes a snakemake workflow to downlod and building the databases
-    """
+    """Executes a snakemake workflow to downlod and building the databases"""
     logger.info("Building taxdb")
     cmd = (
         "snakemake --snakefile {snakefile} "
@@ -494,10 +491,13 @@ def preparedb(db_dir, jobs, snakemake_args):
         exit(1)
 
     logger.info(f"Adding {db_dir} to config.yaml")
-    update_config(config_path=CONFIG, data={"database_dir" :db_dir})
+    update_config(config_path=CONFIG, data={"database_dir": db_dir})
+
 
 # Download pre-built from server
 default_db, choices, default_url = format_databases(config=CONFIG_CONTENT)
+
+
 @cli.command(
     context_settings=dict(ignore_unknown_options=True),
     short_help="pull pre-built databases from a remote server",
@@ -514,7 +514,7 @@ default_db, choices, default_url = format_databases(config=CONFIG_CONTENT)
     default=default_db,
     type=click.Choice(choices, case_sensitive=False),
     show_default=True,
-    help=f"version of the database to download",
+    help="version of the database to download",
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
 def downloaddb(db_dir, dbversion, snakemake_args):
@@ -546,7 +546,10 @@ def downloaddb(db_dir, dbversion, snakemake_args):
         exit(1)
 
     logger.info(f"Adding {db_dir} to config.yaml")
-    update_config(config_path=CONFIG, data={"database_dir" : str(Path(db_dir) / dbversion)})
+    update_config(
+        config_path=CONFIG, data={"database_dir": str(Path(db_dir) / dbversion)}
+    )
+
 
 # utility functions
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -557,6 +560,8 @@ def utils(obj):
     tool chain for calculating ani, aai and visualizations
     """
     pass
+
+
 @utils.command(
     context_settings=dict(ignore_unknown_options=True),
     help="""calculates ani from mmseqs ICTV genome comparision results
@@ -577,71 +582,76 @@ def utils(obj):
     "--input",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="BLAST tabular (m8) output file",
-    required=True
+    required=True,
 )
 @click.option(
     "--header",
     callback=parse_csv,
     help="columnames of the m8 file",
-    default = HEADER,
-    required=False
+    default=HEADER,
+    required=False,
 )
 @click.option(
     "--qcov",
     type=float,
     default=0,
     help="filter results below this qcov cutoff",
-    required=False
+    required=False,
 )
 @click.option(
     "--tani",
     type=float,
     default=0,
     help="filter results below this tani cutoff",
-    required=False
+    required=False,
 )
 @click.option(
     "--ani",
     type=float,
     default=0,
     help="filter results below this ani cutoff",
-    required=False
+    required=False,
 )
 @click.option(
     "--all",
     is_flag=True,
     default=False,
     help="get ani for all hits per query sequence. by default only outputs the besthits",
-    required=False
+    required=False,
 )
 @click.option(
     "--batch",
     type=int,
     default=5000,
     help="number of records to process at a time",
-    required=False
+    required=False,
 )
 def ani(input, header, ani, tani, qcov, all, batch):
     """
-    calculates the average nucleotide identity and coverage of a query sequence 
-    to the best 
+    calculates the average nucleotide identity and coverage of a query sequence
+    to the best
     """
-    
+
     CHUNK_SIZE = batch
     file_name = os.path.basename(input)
-    
+
     index = index_m8(input, kind="ani")
     tmp_files = []
     with logging_redirect_tqdm():
-        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
-            finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
-            outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv")
+        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=" ="):
+            finput = load_chunk(
+                input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index))
+            )
+            outfile = os.path.join(
+                os.path.dirname(input),
+                f"{os.path.splitext(file_name)[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv",
+            )
             status = ani_summary(finput, all=all, header=header)
             if isinstance(status, pl.DataFrame):
-                status.write_csv(outfile,  separator="\t")
+                status.write_csv(outfile, separator="\t")
                 logger.info(f"{outfile} updated")
                 tmp_files.append(outfile)
-                
+
             else:
                 # exit code 1
                 logger.error("error occured!")
@@ -651,13 +661,16 @@ def ani(input, header, ani, tani, qcov, all, batch):
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
-    outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv")
+    outfile = os.path.join(
+        os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv"
+    )
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
 
     # Remove temporary TSV files
     for file in tmp_files:
         os.remove(file)
+
 
 @utils.command(
     context_settings=dict(ignore_unknown_options=True),
@@ -681,113 +694,129 @@ def ani(input, header, ani, tani, qcov, all, batch):
     "--input",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="BLAST tabular (m8) output file",
-    required=True
+    required=True,
 )
 @click.option(
     "-g",
     "--gff",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="gff file with gene cordinates of the query sequences",
-    required=True
+    required=True,
 )
 @click.option(
     "--header",
     callback=parse_csv,
     help="columnames of the m8 file ",
-    default = HEADER,
-    required=False
+    default=HEADER,
+    required=False,
 )
 @click.option(
     "--taaig",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to genera",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaif",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to families",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaio",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to orders",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaic",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to classes",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaip",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to phyla",
-    required=False
+    required=False,
 )
 @click.option(
     "--taaik",
     type=float,
     default=0.3,
     help="assign sequences above this taai threshold to kingdoms",
-    required=False
+    required=False,
 )
 @click.option(
     "-d",
     "--dbdir",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="path to the ref databases",
-    required=True
+    required=True,
 )
 @click.option(
     "--batch",
     type=int,
     default=5000,
     help="number of records to process at a time",
-    required=False
+    required=False,
 )
 @click.option(
     "--topk",
     type=int,
     default=5,
     help="number of hits to select per query",
-    required=False
+    required=False,
 )
 @click.option(
     "--batch",
     type=int,
     default=5000,
     help="number of records to process at a time",
-    required=False
+    required=False,
 )
-def aai(input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk):
+def aai(
+    input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk
+):
     """
-    calculates the average aminoacid identity and coverage of a query sequence 
+    calculates the average aminoacid identity and coverage of a query sequence
     to the genomes in the target database
     """
     CHUNK_SIZE = batch
-    THRESHOLDS =  {"genus": taaig, "family": taaif, "order": taaio, "class" : taaic, "phylum": taaip, "kingdom": taaik}
+    THRESHOLDS = {
+        "genus": taaig,
+        "family": taaif,
+        "order": taaio,
+        "class": taaic,
+        "phylum": taaip,
+        "kingdom": taaik,
+    }
     file_name = os.path.basename(input)
-    
+
     index = index_m8(input, kind="axi")
     tmp_files = []
     with logging_redirect_tqdm():
-        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
-            finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
-            outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv")
-            status = axi_summary(finput, gff, dbdir,header, THRESHOLDS, top_k=topk, kind='aai')
+        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=" ="):
+            finput = load_chunk(
+                input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index))
+            )
+            outfile = os.path.join(
+                os.path.dirname(input),
+                f"{os.path.splitext(file_name)[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv",
+            )
+            status = axi_summary(
+                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="aai"
+            )
             if isinstance(status, pl.DataFrame):
-                status.write_csv(outfile,  separator="\t")
+                status.write_csv(outfile, separator="\t")
                 logger.info(f"{outfile} updated")
                 tmp_files.append(outfile)
-                
+
             else:
                 # exit code 1
                 logger.error("error occured!")
@@ -797,8 +826,9 @@ def aai(input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, g
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
-    outfile = os.path.join(os.path.dirname(input),
-                           f"{os.path.splitext(file_name)[0]}_aai.tsv")
+    outfile = os.path.join(
+        os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai.tsv"
+    )
 
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
@@ -806,6 +836,7 @@ def aai(input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, g
     # Remove temporary TSV files
     for file in tmp_files:
         os.remove(file)
+
 
 @utils.command(
     context_settings=dict(ignore_unknown_options=True),
@@ -829,100 +860,112 @@ def aai(input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, g
     "--input",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="BLAST tabular (m8) output file",
-    required=True
+    required=True,
 )
 @click.option(
     "-g",
     "--gff",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="gff file with gene cordinates of the query sequences",
-    required=True
+    required=True,
 )
 @click.option(
     "--header",
     callback=parse_csv,
     help="columnames of the m8 file ",
-    default = HEADER,
-    required=False
+    default=HEADER,
+    required=False,
 )
 @click.option(
     "--tapif",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to families",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapio",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to orders",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapic",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to classes",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapip",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to phyla",
-    required=False
+    required=False,
 )
 @click.option(
     "--tapik",
     type=float,
     default=0.3,
     help="assign sequences above this tapi threshold to kingdoms",
-    required=False
+    required=False,
 )
 @click.option(
     "-d",
     "--dbdir",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="path to the ref databases",
-    required=True
+    required=True,
 )
 @click.option(
     "--topk",
     type=int,
     default=5,
     help="number of hits to select per query",
-    required=False
+    required=False,
 )
 @click.option(
     "--batch",
     type=int,
     default=5000,
     help="number of records to process at a time",
-    required=False
+    required=False,
 )
-
 def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk):
     """
-    calculates the average profile identity and coverage of a query sequence 
+    calculates the average profile identity and coverage of a query sequence
     to the genomes in the target database
     """
     CHUNK_SIZE = batch
-    THRESHOLDS =  {"family": tapif, "order": tapio, "class" : tapic, "phylum": tapip, "kingdom": tapik}
+    THRESHOLDS = {
+        "family": tapif,
+        "order": tapio,
+        "class": tapic,
+        "phylum": tapip,
+        "kingdom": tapik,
+    }
     file_name = os.path.basename(input)
-    
+
     index = index_m8(input, kind="axi")
     tmp_files = []
     with logging_redirect_tqdm():
-        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=' ='):
-            finput = load_chunk(input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index)))
-            outfile = os.path.join(os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv")
-            status = axi_summary(finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind='api')
+        for i in tqdm(range(0, len(index), CHUNK_SIZE), ncols=70, ascii=" ="):
+            finput = load_chunk(
+                input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index))
+            )
+            outfile = os.path.join(
+                os.path.dirname(input),
+                f"{os.path.splitext(file_name)[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv",
+            )
+            status = axi_summary(
+                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="api"
+            )
             if isinstance(status, pl.DataFrame):
-                status.write_csv(outfile,  separator="\t")
+                status.write_csv(outfile, separator="\t")
                 logger.info(f"{outfile} updated")
                 tmp_files.append(outfile)
-                
+
             else:
                 # exit code 1
                 logger.error("error occured!")
@@ -932,14 +975,16 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
-    outfile = os.path.join(os.path.dirname(input),
-                           f"{os.path.splitext(file_name)[0]}_api.tsv")
+    outfile = os.path.join(
+        os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api.tsv"
+    )
     df.write_csv(outfile, separator="\t")
     logger.info(f"{outfile} updated")
 
     # Remove temporary TSV files
     for file in tmp_files:
         os.remove(file)
+
 
 @utils.command(
     context_settings=dict(ignore_unknown_options=True),
@@ -959,28 +1004,28 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     "--input",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="multi fasta file",
-    required=True
+    required=True,
 )
 @click.option(
     "-o",
     "--output",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="output file with fasta fragments",
-    required=True
+    required=True,
 )
 @click.option(
     "--min",
     type=int,
     default=0.1,
     help="minium fragement length as a percentage of the input sequence's length",
-    required=False
+    required=False,
 )
 @click.option(
     "--max",
     type=int,
     default=0.9,
     help="maxmium fragment length as a percentage of the input sequence's length",
-    required=False
+    required=False,
 )
 def fragment(input, header, min, max, batch, dbdir, gff):
     """
@@ -993,4 +1038,3 @@ cli.add_command(utils)
 
 if __name__ == "__main__":
     cli()
-

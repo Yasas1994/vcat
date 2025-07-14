@@ -3,12 +3,10 @@ import taxopy
 import polars.selectors as cs
 import numpy as np
 from typing import List, Union
-import numpy as np
 from tqdm import tqdm
 import mmap
-import pickle
 from collections import defaultdict, OrderedDict
-from io import StringIO  
+from io import StringIO
 
 # pandas implementation: readable but slow
 # def compute_ani(alns):
@@ -27,7 +25,7 @@ from io import StringIO
 #     valid[1:-1] = starts[1:] >= ends[:-1]
 #     return np.vstack((starts[:][valid[:-1]], ends[:][valid[1:]])).T
 
-# def compute_cov(alns):   
+# def compute_cov(alns):
 #     t = alns[["qstart", "qend"]].to_numpy()
 #     # sort both axis of the interval tree and merge overlaps
 #     merged =  merge_intervals(np.sort(t, axis=1)[np.argsort(t, axis=0)[:,0]])
@@ -44,7 +42,7 @@ from io import StringIO
 #         output.append(
 #             {"query":g[0],
 #             "target": g[1],
-#             "coverage":compute_cov(g_), 
+#             "coverage":compute_cov(g_),
 #             "ani":compute_ani(g_),
 #             "lineage": g_["taxlineage"].iloc[0],
 #             "qlen": g_["qlen"].iloc[0],
@@ -56,8 +54,8 @@ from io import StringIO
 #     ani.iloc[ani.groupby("query")["score"].idxmax().values].to_csv(outfile, index=None, sep="\t")
 
 
-
 # polars implementation: fast!
+
 
 def merge_intervals(intervals: np.ndarray) -> np.ndarray:
     """Merge overlapping intervals using numpy."""
@@ -73,32 +71,33 @@ def compute_cov(alns: List[pl.Series]) -> float:
     """Compute query coverage using polars and numpy"""
 
     t = np.stack((alns[0].to_numpy(), alns[1].to_numpy()), axis=1)
-    merged =  merge_intervals(np.sort(t, axis=1)[np.argsort(t, axis=0)[:,0]])
+    merged = merge_intervals(np.sort(t, axis=1)[np.argsort(t, axis=0)[:, 0]])
     return np.round(np.sum(np.diff(merged)) / alns[2][0], 2)
 
 
 # ** Process the grouped data **
-def ani_summary(infile: str, all:bool, header: list) -> Union[pl.DataFrame, Exception]:
+def ani_summary(infile: str, all: bool, header: list) -> Union[pl.DataFrame, Exception]:
     try:
-        mmseqs_nuc = pl.read_csv(infile,
-                            has_header = False,
-                            separator="\t",
-                            new_columns=header)
-        output = (
-            mmseqs_nuc
-            .group_by(["query", "target"])
-            .agg([
+        mmseqs_nuc = pl.read_csv(
+            infile, has_header=False, separator="\t", new_columns=header
+        )
+        output = mmseqs_nuc.group_by(["query", "target"]).agg(
+            [
                 pl.col("qlen").first(),
                 pl.col("tlen").first(),
                 pl.col("taxlineage").first(),
                 pl.col("taxid").first(),
                 # to do: re-implement in native api
-                pl.map_groups(exprs=["qstart", "qend", "qlen"],function=lambda df: compute_cov(df), return_dtype=pl.Float64).alias("qcov"),
-                # computes ani 
-                ((pl.col("alnlen") * pl.col("fident")).sum()/pl.col("alnlen").sum()).round(2).alias("ani"),
-                
-
-            ])
+                pl.map_groups(
+                    exprs=["qstart", "qend", "qlen"],
+                    function=lambda df: compute_cov(df),
+                    return_dtype=pl.Float64,
+                ).alias("qcov"),
+                # computes ani
+                ((pl.col("alnlen") * pl.col("fident")).sum() / pl.col("alnlen").sum())
+                .round(2)
+                .alias("ani"),
+            ]
         )
 
         # Compute the final column 'tani' and find the max value per query
@@ -108,11 +107,14 @@ def ani_summary(infile: str, all:bool, header: list) -> Union[pl.DataFrame, Exce
 
         if not all:
             best_hits = output.filter(
-                pl.col("tani") == output.group_by("query").agg(pl.max("tani")).join(output, on="query")["tani"]
+                pl.col("tani")
+                == output.group_by("query")
+                .agg(pl.max("tani"))
+                .join(output, on="query")["tani"]
             )
-            return best_hits#.write_csv(outfile,  separator="\t")
+            return best_hits  # .write_csv(outfile,  separator="\t")
         else:
-            return output#.write_csv(outfile,  separator="\t")
+            return output  # .write_csv(outfile,  separator="\t")
 
         return 0
     except Exception as e:
@@ -121,137 +123,217 @@ def ani_summary(infile: str, all:bool, header: list) -> Union[pl.DataFrame, Exce
 
 # aai calculation code
 
+
 def trim_lineage(taxid: int, taxdb: taxopy.core.TaxDb) -> int:
     # trims lineages to genus level
     if taxdb.taxid2rank[taxid] == "species":
         return taxdb.taxid2parent[taxid]
     return taxid
 
-def get_taxid2taxon_map(df: pl.DataFrame, taxdb: taxopy.core.TaxDb) -> dict[OrderedDict]:
+
+def get_taxid2taxon_map(
+    df: pl.DataFrame, taxdb: taxopy.core.TaxDb
+) -> dict[OrderedDict]:
     tmap = dict()
     for x in list(df["taxid"].unique()):
-        tmap[x] =  taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
-        tmap[x] =  taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
+        tmap[x] = taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
+        tmap[x] = taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
     return tmap
 
-def cal_axi(df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb, kind:str) -> tuple[pl.DataFrame, pl.Series]:
-    tkind = f't{kind}' 
+
+def cal_axi(
+    df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb, kind: str
+) -> tuple[pl.DataFrame, pl.Series]:
+    tkind = f"t{kind}"
     # print("cal axi prefilter", df['seqid'].unique().len())
     # print("cal axi postfilter == -1", df.filter(pl.col(rank) != -1)["seqid"].unique().len())
     # print("cal axi postfilter == -1 ", df.filter(pl.col(rank) == -1)["seqid"].unique().len())
     # print("cal axi postfilter", df.filter(pl.col(rank) == -1 ).select(["seqid", rank ]))
     # one seq id can have proteins mapping to different taxids
     # only filterout targets that do not map to trank not qrank
-    tmp = df.filter(pl.col(rank) != -1).\
-        group_by(["seqid",rank]).agg(
-                                        ((pl.col("fident") * pl.col("alnlen")).sum()/ pl.col("alnlen").sum()).round(3).alias(kind),
-                                        (pl.col("qlen").unique().len()/ pl.first("qlens").list.len()).round(3).alias("qcov"),
-                                        pl.first("qseqlen"),
-                                        pl.col("qlen").unique().len().alias("mgenes"),
-                                        (pl.first("qlens").list.len()).round(3).alias("qgenes"))\
-                                    .with_columns(
-                                        (pl.col(kind) * pl.col("qcov")).round(3).alias(tkind),
-                                            )\
-                                    .group_by("seqid")\
-                                .agg(
-                                        pl.all().sort_by(tkind).last(),
-                                        )
+    tmp = (
+        df.filter(pl.col(rank) != -1)
+        .group_by(["seqid", rank])
+        .agg(
+            ((pl.col("fident") * pl.col("alnlen")).sum() / pl.col("alnlen").sum())
+            .round(3)
+            .alias(kind),
+            (pl.col("qlen").unique().len() / pl.first("qlens").list.len())
+            .round(3)
+            .alias("qcov"),
+            pl.first("qseqlen"),
+            pl.col("qlen").unique().len().alias("mgenes"),
+            (pl.first("qlens").list.len()).round(3).alias("qgenes"),
+        )
+        .with_columns(
+            (pl.col(kind) * pl.col("qcov")).round(3).alias(tkind),
+        )
+        .group_by("seqid")
+        .agg(
+            pl.all().sort_by(tkind).last(),
+        )
+    )
     prefilt = set(df["seqid"].unique())
     postfilt = set(tmp.filter(pl.col(tkind) >= threshold)["seqid"].unique())
-    tmp2 = tmp.sort(tkind).filter(pl.col(tkind) >= threshold)\
-    .with_columns(pl.col(rank).map_elements(lambda x : str(taxopy.Taxon(x, taxdb=taxdb)),
-                                               return_dtype=str ).alias("taxlineage"))\
-    .with_columns(level = pl.lit(rank))
-    
+    tmp2 = (
+        tmp.sort(tkind)
+        .filter(pl.col(tkind) >= threshold)
+        .with_columns(
+            pl.col(rank)
+            .map_elements(lambda x: str(taxopy.Taxon(x, taxdb=taxdb)), return_dtype=str)
+            .alias("taxlineage")
+        )
+        .with_columns(level=pl.lit(rank))
+    )
+
     # return taxids with taxi < threshold and pl.col(rank) == -1
     # tmp.filter(pl.col(tkind) < threshold)["seqid"]
     return (tmp2.rename({rank: "taxid"}), list(prefilt - postfilt))
 
-def axi_summary(input: str, gff: str, dbdir:str, header:list, thresholds:dict, top_k:int, kind:str) -> Union[pl.DataFrame, Exception]:
+
+def axi_summary(
+    input: str,
+    gff: str,
+    dbdir: str,
+    header: list,
+    thresholds: dict,
+    top_k: int,
+    kind: str,
+) -> Union[pl.DataFrame, Exception]:
     # ps: optimized for speed not for readability
 
-    taxdb = taxopy.TaxDb(nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
-                    names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
-                    merged_dmp=f"{dbdir}/ictv-taxdump/merged.dmp")
+    taxdb = taxopy.TaxDb(
+        nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
+        names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
+        merged_dmp=f"{dbdir}/ictv-taxdump/merged.dmp",
+    )
     # extract query lengths (genomic seqs)
     leninf = []
     with open(gff) as fh:
         for i in fh:
             if i.startswith("# Sequence Data:"):
-
                 for j in i.rstrip("\n").strip("# Sequence Data: ").split(";", 2):
                     if j.startswith("seqlen="):
                         s = j.lstrip("seqlen=")
                     elif j.startswith("seqhdr="):
-                        h =j.lstrip("seqhdr=").strip('"').split()[0]
-                        h =j.lstrip("seqhdr=").strip('"').split()[0]
-                leninf.append({"seqid": h, "qseqlen" : int(s)})
+                        h = j.lstrip("seqhdr=").strip('"').split()[0]
+                        h = j.lstrip("seqhdr=").strip('"').split()[0]
+                leninf.append({"seqid": h, "qseqlen": int(s)})
 
     seqleninfo = pl.DataFrame(leninf)
 
-    col_names = ["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"]
+    col_names = [
+        "seqid",
+        "source",
+        "type",
+        "start",
+        "end",
+        "score",
+        "strand",
+        "phase",
+        "attributes",
+    ]
     # extract ORF stats
-    gff_df = pl.read_csv(gff, 
-                        separator="\t", 
-                        comment_prefix="#", 
-                        has_header=False,
-                        new_columns=col_names, 
-                        schema_overrides={"start": pl.Int64, "end": pl.Int64, "score": pl.Float64})
-    
-    gff_df = gff_df.with_columns((pl.col("seqid") + pl.col("attributes")\
-                                  .map_elements(lambda x : f'_{x.split(";")[0].strip("ID=").split("_")[-1]}', 
-                                                 return_dtype=str)).alias("query"))
+    gff_df = pl.read_csv(
+        gff,
+        separator="\t",
+        comment_prefix="#",
+        has_header=False,
+        new_columns=col_names,
+        schema_overrides={"start": pl.Int64, "end": pl.Int64, "score": pl.Float64},
+    )
+
+    gff_df = gff_df.with_columns(
+        (
+            pl.col("seqid")
+            + pl.col("attributes").map_elements(
+                lambda x: f'_{x.split(";")[0].strip("ID=").split("_")[-1]}',
+                return_dtype=str,
+            )
+        ).alias("query")
+    )
     gff_df = gff_df.join(seqleninfo, on="seqid", how="inner")
 
-    mmseqs_axi = pl.read_csv(input,
-                            has_header = False,
-                            separator="\t",
-                            new_columns=header)
+    mmseqs_axi = pl.read_csv(
+        input, has_header=False, separator="\t", new_columns=header
+    )
     # pick the top-k hits per query protein
-    mmseqs_axi = mmseqs_axi.group_by("query").agg(
-                            pl.all().top_k_by("fident", top_k),
-                        ).explode(pl.all().exclude("query"))
-    
-    mmseqs_axi  = gff_df.select(~cs.by_name(["source", "type", "phase", "attributes"])).join(mmseqs_axi, on="query", how="right")
-    mmseqs_axi  = mmseqs_axi.with_columns(pl.col("fident").fill_null(0))
-    mmseqs_axi  = mmseqs_axi.with_columns(pl.col("taxid").fill_null(1))
-    mmseqs_axi  = mmseqs_axi.with_columns(pl.col("alnlen").fill_null(0))
+    mmseqs_axi = (
+        mmseqs_axi.group_by("query")
+        .agg(
+            pl.all().top_k_by("fident", top_k),
+        )
+        .explode(pl.all().exclude("query"))
+    )
 
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x : trim_lineage(x, taxdb=taxdb),
-                                                           return_dtype=int))
+    mmseqs_axi = gff_df.select(
+        ~cs.by_name(["source", "type", "phase", "attributes"])
+    ).join(mmseqs_axi, on="query", how="right")
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("fident").fill_null(0))
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").fill_null(1))
+    mmseqs_axi = mmseqs_axi.with_columns(pl.col("alnlen").fill_null(0))
+
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid").map_elements(
+            lambda x: trim_lineage(x, taxdb=taxdb), return_dtype=int
+        )
+    )
     taxonmap = get_taxid2taxon_map(mmseqs_axi, taxdb=taxdb)
 
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("species", -1),
-                                                            return_dtype=int).alias("species"))
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("genus", -1),
-                                                            return_dtype=int).alias("genus"))
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("family", -1),
-                                                            return_dtype=int).alias("family"))
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("order", -1),
-                                                            return_dtype=int).alias("order"))
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("class", -1),
-                                                            return_dtype=int).alias("class"))
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("phylum", -1),
-                                                            return_dtype=int).alias("phylum"))
-    mmseqs_axi = mmseqs_axi.with_columns(pl.col("taxid").map_elements(lambda x: taxonmap[x].get("kingdom", -1),
-                                                            return_dtype=int).alias("kingdom"))
-    seqid2qlens = mmseqs_axi.group_by("seqid")\
-                .agg(
-                    pl.col("qlen").unique().alias("qlens")
-                    )
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid")
+        .map_elements(lambda x: taxonmap[x].get("species", -1), return_dtype=int)
+        .alias("species")
+    )
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid")
+        .map_elements(lambda x: taxonmap[x].get("genus", -1), return_dtype=int)
+        .alias("genus")
+    )
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid")
+        .map_elements(lambda x: taxonmap[x].get("family", -1), return_dtype=int)
+        .alias("family")
+    )
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid")
+        .map_elements(lambda x: taxonmap[x].get("order", -1), return_dtype=int)
+        .alias("order")
+    )
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid")
+        .map_elements(lambda x: taxonmap[x].get("class", -1), return_dtype=int)
+        .alias("class")
+    )
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid")
+        .map_elements(lambda x: taxonmap[x].get("phylum", -1), return_dtype=int)
+        .alias("phylum")
+    )
+    mmseqs_axi = mmseqs_axi.with_columns(
+        pl.col("taxid")
+        .map_elements(lambda x: taxonmap[x].get("kingdom", -1), return_dtype=int)
+        .alias("kingdom")
+    )
+    seqid2qlens = mmseqs_axi.group_by("seqid").agg(
+        pl.col("qlen").unique().alias("qlens")
+    )
     mmseqs_axi = mmseqs_axi.join(seqid2qlens, on="seqid", how="left")
 
-    try: 
+    try:
         results = []
         unmatched = mmseqs_axi["seqid"].to_list()
         for i in list(thresholds.keys()):
             mmseqs_nuc_f = mmseqs_axi.filter(pl.col("seqid").is_in(unmatched))
-            tmp, unmatched = cal_axi(mmseqs_nuc_f, rank=i, threshold=thresholds[i], taxdb=taxdb, kind=kind)
+            tmp, unmatched = cal_axi(
+                mmseqs_nuc_f, rank=i, threshold=thresholds[i], taxdb=taxdb, kind=kind
+            )
             results.append(tmp)
         return pl.concat(results)
 
     except Exception as e:
         return e
+
 
 def index_m8(input: str, kind: str) -> defaultdict[list]:
     """
@@ -277,7 +359,7 @@ def index_m8(input: str, kind: str) -> defaultdict[list]:
             line = mmapped_file[pos:end]  # Process as bytes
             key = line.split(b"\t", 1)[0]
             if kind == "axi":
-                key=key.rsplit(b"_", 1)[0]  # Extract key as bytes
+                key = key.rsplit(b"_", 1)[0]  # Extract key as bytes
             index[key.decode()].append(int(pos))  # Store file offset
 
             pos = end + 1  # Move to the next line
@@ -293,23 +375,23 @@ def index_m8(input: str, kind: str) -> defaultdict[list]:
 
     return index2
 
-def load_chunk(input: str,
-               index: defaultdict[list], 
-               recstart: int,
-               recend: int) -> StringIO:
+
+def load_chunk(
+    input: str, index: defaultdict[list], recstart: int, recend: int
+) -> StringIO:
     string_dump = ""
     with open(input, "r+b") as fh:
         mmapped_file = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
-        
+
         records = list(range(recstart, recend))
-            # Retrieve lines at given offsets
+        # Retrieve lines at given offsets
         for rec in records:
             for pos in index[rec]:
                 end = mmapped_file.find(b"\n", pos)  # Find the end of the line
                 if end == -1:  # Handle last line case
                     end = len(mmapped_file)
-                
-                string_dump += mmapped_file[pos:end].decode()+"\n"
+
+                string_dump += mmapped_file[pos:end].decode() + "\n"
 
     return StringIO(string_dump)
 

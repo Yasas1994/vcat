@@ -27,7 +27,7 @@ setup(
     packages=["vcat"],
     include_package_data=True,
     package_data={
-        "vcat":["pipeline/*", "pipeline/rules/*"],
+        "vcat": ["pipeline/*", "pipeline/rules/*"],
     },
     data_files=[(".", ["README.md", "LICENSE", "MANIFEST.in"])],
     install_requires=[],
@@ -35,13 +35,11 @@ setup(
     entry_points={"console_scripts": ["vcat = vcat.cli:cli"]},
     classifiers=["Topic :: Scientific/Engineering :: Bio-Informatics"],
     scripts=[
-
-             "scripts/correct_profile_taxinfo.py",
-             "scripts/get_cluster_lca.py",
-             "scripts/download_gb.py",
-             "scripts/ictv_out.py",
-             "scripts/postprocess.py",
-             "scripts/prepare.py",
-             
-             ],
+        "scripts/correct_profile_taxinfo.py",
+        "scripts/get_cluster_lca.py",
+        "scripts/download_gb.py",
+        "scripts/ictv_out.py",
+        "scripts/postprocess.py",
+        "scripts/prepare.py",
+    ],
 )
