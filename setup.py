@@ -15,7 +15,7 @@ with open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="vcat",
-    version="0.0.1b",
+    version="0.0.2",
     url="https://github.com/Yasas94/vcat",
     license=__license__,
     author=__author__,
