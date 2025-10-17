@@ -1,4 +1,5 @@
 import polars as pl
+import pandas as pd
 import taxopy
 import polars.selectors as cs
 import numpy as np
@@ -77,46 +78,90 @@ def compute_cov(alns: List[pl.Series]) -> float:
 
 # ** Process the grouped data **
 def ani_summary(infile: str, all: bool, header: list) -> Union[pl.DataFrame, Exception]:
+    """
+    Robust per-group ANI summary that avoids list[f64] issues in Polars by
+    grouping via pandas and computing scalar aggregates per (query,target).
+    """
     try:
         mmseqs_nuc = pl.read_csv(
             infile, has_header=False, separator="\t", new_columns=header
         )
-        output = mmseqs_nuc.group_by(["query", "target"]).agg(
-            [
-                pl.col("qlen").first(),
-                pl.col("tlen").first(),
-                pl.col("taxlineage").first(),
-                pl.col("taxid").first(),
-                # to do: re-implement in native api
-                pl.map_groups(
-                    exprs=["qstart", "qend", "qlen"],
-                    function=lambda df: compute_cov(df),
-                    return_dtype=pl.Float64,
-                ).alias("qcov"),
-                # computes ani
-                ((pl.col("alnlen") * pl.col("fident")).sum() / pl.col("alnlen").sum())
-                .round(2)
-                .alias("ani"),
-            ]
+
+        # cast important columns explicitly
+        mmseqs_nuc = mmseqs_nuc.with_columns(
+            pl.col("fident").cast(pl.Float64),
+            pl.col("alnlen").cast(pl.Float64),
+            pl.col("qlen").cast(pl.Int64),
+            pl.col("tlen").cast(pl.Int64),
+            pl.col("qstart").cast(pl.Int64),
+            pl.col("qend").cast(pl.Int64),
         )
 
-        # Compute the final column 'tani' and find the max value per query
-        output = output.with_columns(
-            (pl.col("ani") * pl.col("qcov")).round(3).alias("tani")
+        # drop rows missing numeric values
+        mmseqs_nuc = mmseqs_nuc.filter(
+            pl.col("alnlen").is_not_null() & pl.col("fident").is_not_null()
+        )
+
+        # convert to pandas for reliable group iteration
+        # pdf = mmseqs_nuc.to_pandas()
+        rows = []
+        # for (_, _), g in pdf.groupby(["query", "target"]):
+        for _, gpl in  mmseqs_nuc.partition_by("query", "target", as_dict=True).items():
+            #gpl = pl.from_pandas(g)
+
+            # basic scalars
+            q = gpl["query"][0]
+            t = gpl["target"][0]
+            qlen = int(gpl["qlen"][0]) if "qlen" in gpl.columns else 0
+            tlen = int(gpl["tlen"][0]) if "tlen" in gpl.columns else 0
+            taxlineage = gpl["taxlineage"][0] if "taxlineage" in gpl.columns else ""
+            taxid = int(gpl["taxid"][0]) if "taxid" in gpl.columns and gpl["taxid"][0] is not None else None
+
+            # numeric arrays
+            alnlen = np.asarray(gpl["alnlen"].to_numpy(), dtype=float)
+            fident = np.asarray(gpl["fident"].to_numpy(), dtype=float)
+
+            alnlen_sum = alnlen.sum() if alnlen.size else 0.0
+            if alnlen_sum == 0:
+                ani = 0.0
+            else:
+                ani = float((alnlen * fident).sum() / alnlen_sum)
+            ani = round(ani, 3)
+
+            # compute qcov using existing compute_cov (expects list of Series)
+            try:
+                qcov = compute_cov([gpl["qstart"], gpl["qend"], gpl["qlen"]])
+            except Exception:
+                qcov = 0.0
+
+            tani = round(ani * qcov, 4)
+
+            rows.append(
+                {
+                    "query": q,
+                    "target": t,
+                    "qlen": qlen,
+                    "tlen": tlen,
+                    "taxlineage": taxlineage,
+                    "taxid": taxid,
+                    "qcov": qcov,
+                    "ani": ani,
+                    "tani": tani,
+                }
+            )
+
+        out = pl.DataFrame(rows) if rows else pl.DataFrame(
+            {"query":[],"target":[],"qlen":[],"tlen":[],"taxlineage":[],"taxid":[],"qcov":[],"ani":[],"tani":[]}
         )
 
         if not all:
-            best_hits = output.filter(
-                pl.col("tani")
-                == output.group_by("query")
-                .agg(pl.max("tani"))
-                .join(output, on="query")["tani"]
-            )
-            return best_hits  # .write_csv(outfile,  separator="\t")
+            # keep best hit per query (highest tani)
+            out_pdf = out.to_pandas()
+            best_pdf = out_pdf.sort_values("tani", ascending=False).drop_duplicates("query", keep="first")
+            return pl.from_pandas(best_pdf)
         else:
-            return output  # .write_csv(outfile,  separator="\t")
+            return out
 
-        return 0
     except Exception as e:
         return e
 
