@@ -936,7 +936,7 @@ def aai(
     "--all",
     is_flag=True,
     default=False,
-    help="get aai for all top-k hits per query sequence. by default only outputs the besthit",
+    help="get api for all top-k hits per query sequence. by default only outputs the besthit",
     required=False,
 )
 def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk, all):

@@ -213,10 +213,10 @@ def cal_axi(
         .with_columns(
             (pl.col(kind) * pl.col("qcov")).round(3).alias(tkind),
         )
-        .group_by("seqid")
-        .agg(
-            pl.all().sort_by(tkind).last(),
-        )
+        # .group_by("seqid")
+        # .agg(
+        #     pl.all().sort_by(tkind).last(),
+        # )
     )
     if all == False:
         tmp = tmp.group_by("seqid").agg(
