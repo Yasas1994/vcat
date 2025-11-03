@@ -774,14 +774,14 @@ def ani(input, header, ani, tani, qcov, all, batch):
     required=False,
 )
 @click.option(
-    "--batch",
-    type=int,
-    default=5000,
-    help="number of records to process at a time",
+    "--all",
+    is_flag=True,
+    default=False,
+    help="get aai for all top-k hits per query sequence. by default only outputs the besthit",
     required=False,
 )
 def aai(
-    input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk
+    input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk, all
 ):
     """
     calculates the average aminoacid identity and coverage of a query sequence
@@ -810,7 +810,7 @@ def aai(
                 f"{os.path.splitext(file_name)[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv",
             )
             status = axi_summary(
-                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="aai"
+                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="aai", all=all
             )
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile, separator="\t")
@@ -932,7 +932,14 @@ def aai(
     help="number of records to process at a time",
     required=False,
 )
-def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk):
+@click.option(
+    "--all",
+    is_flag=True,
+    default=False,
+    help="get aai for all top-k hits per query sequence. by default only outputs the besthit",
+    required=False,
+)
+def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk, all):
     """
     calculates the average profile identity and coverage of a query sequence
     to the genomes in the target database
@@ -959,7 +966,7 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
                 f"{os.path.splitext(file_name)[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv",
             )
             status = axi_summary(
-                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="api"
+                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="api", all=all
             )
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile, separator="\t")

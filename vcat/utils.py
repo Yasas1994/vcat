@@ -187,7 +187,7 @@ def get_taxid2taxon_map(
 
 
 def cal_axi(
-    df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb, kind: str
+    df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb, kind: str, all:bool=False,
 ) -> tuple[pl.DataFrame, pl.Series]:
     tkind = f"t{kind}"
     # print("cal axi prefilter", df['seqid'].unique().len())
@@ -218,6 +218,10 @@ def cal_axi(
             pl.all().sort_by(tkind).last(),
         )
     )
+    if all == False:
+        tmp = tmp.group_by("seqid").agg(
+                pl.all().sort_by(tkind).last(),
+            )
     prefilt = set(df["seqid"].unique())
     postfilt = set(tmp.filter(pl.col(tkind) >= threshold)["seqid"].unique())
     tmp2 = (
@@ -244,6 +248,7 @@ def axi_summary(
     thresholds: dict,
     top_k: int,
     kind: str,
+    all: bool,
 ) -> Union[pl.DataFrame, Exception]:
     # ps: optimized for speed not for readability
 
@@ -254,6 +259,8 @@ def axi_summary(
     )
     # extract query lengths (genomic seqs)
     leninf = []
+    h = ""
+    s = 0
     with open(gff) as fh:
         for i in fh:
             if i.startswith("# Sequence Data:"):
@@ -371,7 +378,7 @@ def axi_summary(
         for i in list(thresholds.keys()):
             mmseqs_nuc_f = mmseqs_axi.filter(pl.col("seqid").is_in(unmatched))
             tmp, unmatched = cal_axi(
-                mmseqs_nuc_f, rank=i, threshold=thresholds[i], taxdb=taxdb, kind=kind
+                mmseqs_nuc_f, rank=i, threshold=thresholds[i], taxdb=taxdb, kind=kind, all=all
             )
             results.append(tmp)
         return pl.concat(results)
