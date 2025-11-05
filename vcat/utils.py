@@ -1,13 +1,18 @@
-import polars as pl
-import pandas as pd
-import taxopy
-import polars.selectors as cs
-import numpy as np
-from typing import List, Union
+
+from typing import List, Union, Dict, Any, OrderedDict, DefaultDict
 from tqdm import tqdm
 import mmap
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
+from pathlib import Path
+# from collections import OrderedDict as ordereddict
 from io import StringIO
+import polars as pl
+import pandas as pd
+from taxopy.core import TaxDb
+from taxopy import Taxon
+import polars.selectors as cs
+import numpy as np
+from numpy.typing import NDArray
 
 # pandas implementation: readable but slow
 # def compute_ani(alns):
@@ -58,7 +63,7 @@ from io import StringIO
 # polars implementation: fast!
 
 
-def merge_intervals(intervals: np.ndarray) -> np.ndarray:
+def merge_intervals(intervals: NDArray) -> NDArray:
     """Merge overlapping intervals using numpy."""
     starts = intervals[:, 0]
     ends = np.maximum.accumulate(intervals[:, 1])
@@ -77,14 +82,19 @@ def compute_cov(alns: List[pl.Series]) -> float:
 
 
 # ** Process the grouped data **
-def ani_summary(infile: str, all: bool, header: list) -> Union[pl.DataFrame, Exception]:
+def ani_summary(infile: Union[str, StringIO], 
+                all: bool, 
+                header: list) -> Union[Any, Exception]:
     """
     Robust per-group ANI summary that avoids list[f64] issues in Polars by
     grouping via pandas and computing scalar aggregates per (query,target).
     """
     try:
         mmseqs_nuc = pl.read_csv(
-            infile, has_header=False, separator="\t", new_columns=header
+            infile,
+            has_header=False, 
+            separator="\t", 
+            new_columns=header
         )
 
         # cast important columns explicitly
@@ -169,26 +179,35 @@ def ani_summary(infile: str, all: bool, header: list) -> Union[pl.DataFrame, Exc
 # aai calculation code
 
 
-def trim_lineage(taxid: int, taxdb: taxopy.core.TaxDb) -> int:
-    # trims lineages to genus level
-    if taxdb.taxid2rank[taxid] == "species":
+def trim_lineage(taxid: int,
+                 taxdb: TaxDb,
+                 taxomic_level: str = "species"
+                 ) -> int:
+    # trims lineages to the level
+    if taxdb.taxid2rank[taxid] == taxomic_level:
         return taxdb.taxid2parent[taxid]
     return taxid
 
 
 def get_taxid2taxon_map(
-    df: pl.DataFrame, taxdb: taxopy.core.TaxDb
-) -> dict[OrderedDict]:
+    df: pl.DataFrame, 
+    taxdb: TaxDb
+) -> Dict[str, OrderedDict]:
     tmap = dict()
     for x in list(df["taxid"].unique()):
-        tmap[x] = taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
-        tmap[x] = taxopy.Taxon(x, taxdb=taxdb).rank_taxid_dictionary
+        tmap[x] = Taxon(x, taxdb=taxdb).rank_taxid_dictionary
+        tmap[x] = Taxon(x, taxdb=taxdb).rank_taxid_dictionary
     return tmap
 
 
 def cal_axi(
-    df: pl.DataFrame, rank: str, threshold: float, taxdb: taxopy.core.TaxDb, kind: str, all:bool=False,
-) -> tuple[pl.DataFrame, pl.Series]:
+    df: pl.DataFrame, 
+    rank: str, 
+    threshold: float, 
+    taxdb: TaxDb, 
+    kind: str, 
+    all:bool=False,
+) -> tuple[pl.DataFrame, List]:
     tkind = f"t{kind}"
     # print("cal axi prefilter", df['seqid'].unique().len())
     # print("cal axi postfilter == -1", df.filter(pl.col(rank) != -1)["seqid"].unique().len())
@@ -229,7 +248,7 @@ def cal_axi(
         .filter(pl.col(tkind) >= threshold)
         .with_columns(
             pl.col(rank)
-            .map_elements(lambda x: str(taxopy.Taxon(x, taxdb=taxdb)), return_dtype=str)
+            .map_elements(lambda x: str(Taxon(x, taxdb=taxdb)), return_dtype=pl.String)
             .alias("taxlineage")
         )
         .with_columns(level=pl.lit(rank))
@@ -241,18 +260,18 @@ def cal_axi(
 
 
 def axi_summary(
-    input: str,
+    input: Union[str, StringIO],
     gff: str,
     dbdir: str,
     header: list,
-    thresholds: dict,
+    thresholds: Dict[str, float],
     top_k: int,
     kind: str,
     all: bool,
 ) -> Union[pl.DataFrame, Exception]:
     # ps: optimized for speed not for readability
 
-    taxdb = taxopy.TaxDb(
+    taxdb = TaxDb(
         nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
         names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
         merged_dmp=f"{dbdir}/ictv-taxdump/merged.dmp",
@@ -300,7 +319,7 @@ def axi_summary(
             pl.col("seqid")
             + pl.col("attributes").map_elements(
                 lambda x: f'_{x.split(";")[0].strip("ID=").split("_")[-1]}',
-                return_dtype=str,
+                return_dtype=pl.String,
             )
         ).alias("query")
     )
@@ -327,44 +346,44 @@ def axi_summary(
 
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid").map_elements(
-            lambda x: trim_lineage(x, taxdb=taxdb), return_dtype=int
+            lambda x: trim_lineage(x, taxdb=taxdb), return_dtype=pl.Int64
         )
     )
     taxonmap = get_taxid2taxon_map(mmseqs_axi, taxdb=taxdb)
 
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid")
-        .map_elements(lambda x: taxonmap[x].get("species", -1), return_dtype=int)
+        .map_elements(lambda x: taxonmap[x].get("species", -1), return_dtype=pl.Int64)
         .alias("species")
     )
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid")
-        .map_elements(lambda x: taxonmap[x].get("genus", -1), return_dtype=int)
+        .map_elements(lambda x: taxonmap[x].get("genus", -1), return_dtype=pl.Int64)
         .alias("genus")
     )
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid")
-        .map_elements(lambda x: taxonmap[x].get("family", -1), return_dtype=int)
+        .map_elements(lambda x: taxonmap[x].get("family", -1), return_dtype=pl.Int64)
         .alias("family")
     )
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid")
-        .map_elements(lambda x: taxonmap[x].get("order", -1), return_dtype=int)
+        .map_elements(lambda x: taxonmap[x].get("order", -1), return_dtype=pl.Int64)
         .alias("order")
     )
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid")
-        .map_elements(lambda x: taxonmap[x].get("class", -1), return_dtype=int)
+        .map_elements(lambda x: taxonmap[x].get("class", -1), return_dtype=pl.Int64)
         .alias("class")
     )
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid")
-        .map_elements(lambda x: taxonmap[x].get("phylum", -1), return_dtype=int)
+        .map_elements(lambda x: taxonmap[x].get("phylum", -1), return_dtype=pl.Int64)
         .alias("phylum")
     )
     mmseqs_axi = mmseqs_axi.with_columns(
         pl.col("taxid")
-        .map_elements(lambda x: taxonmap[x].get("kingdom", -1), return_dtype=int)
+        .map_elements(lambda x: taxonmap[x].get("kingdom", -1), return_dtype=pl.Int64)
         .alias("kingdom")
     )
     seqid2qlens = mmseqs_axi.group_by("seqid").agg(
@@ -387,7 +406,8 @@ def axi_summary(
         return e
 
 
-def index_m8(input: str, kind: str) -> defaultdict[list]:
+def index_m8(input: Union[str, Path],
+             kind: str) -> defaultdict[str, List]:
     """
     m8 files with blast results can be insanely large and may require a large amount of
     memory to load.
@@ -429,7 +449,10 @@ def index_m8(input: str, kind: str) -> defaultdict[list]:
 
 
 def load_chunk(
-    input: str, index: defaultdict[list], recstart: int, recend: int
+    input: str, 
+    index: DefaultDict[int,List], 
+    recstart: int, 
+    recend: int
 ) -> StringIO:
     string_dump = ""
     with open(input, "r+b") as fh:

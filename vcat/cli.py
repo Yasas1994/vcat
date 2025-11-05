@@ -12,17 +12,23 @@ from vcat.utils import ani_summary, axi_summary, index_m8, load_chunk
 from .color_logger import logger
 
 
+
+# Define the directory containing the pipeline files
+PIPELINE_DIR = os.path.join(os.path.dirname(__file__), "./pipeline")
+VERSION = "0.0.1b"
+CONFIG = os.path.join(PIPELINE_DIR, "config.yaml")
+HEADER = "query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage"
+CONFIG_CONTENT = yaml.safe_load(open(CONFIG, "r"))
+
 def load_configfile(file_path):
     with open(file_path, "r") as f:
         return yaml.safe_load(f)
-
 
 def parse_csv(ctx, param, value):
     """Split the comma-separated input into a list."""
     if value:
         return value.split(",")
     return []
-
 
 def format_databases(config):
     default_url = ""
@@ -34,16 +40,6 @@ def format_databases(config):
             default += i.get("name")
             default_url += i.get("link")
     return default, choices, default_url
-
-
-
-# Define the directory containing the pipeline files
-PIPELINE_DIR = os.path.join(os.path.dirname(__file__), "./pipeline")
-VERSION = "0.0.1b"
-CONFIG = os.path.join(PIPELINE_DIR, "config.yaml")
-HEADER = "query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage"
-CONFIG_CONTENT = yaml.safe_load(open(CONFIG, "r"))
-
 
 def handle_max_mem(max_mem, profile):
     "Specify maximum virtual memory to use by atlas."
