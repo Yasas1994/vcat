@@ -669,15 +669,17 @@ def ani(input, header, ani, tani, qcov, all, batch):
     logger.info("trying to merge temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     tmp = [i for i in tmp if not i.is_empty()]
-    if tmp:
-        df = pl.concat(tmp)
-        outfile = os.path.join(
+    outfile = os.path.join(
             os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv"
         )
+    if tmp:
+        df = pl.concat(tmp)
+
         df.write_csv(outfile, separator="\t")
         logger.info(f"{outfile} updated")
     else:
         logger.info(f"all tables are empty")
+        Path(outfile).touch()
 
     # Remove temporary TSV files
     for file in tmp_files:
@@ -838,15 +840,17 @@ def aai(
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     tmp = [i for i in tmp if not i.is_empty()]
-    if tmp:
-        df = pl.concat(tmp)
-        outfile = os.path.join(
+    outfile = os.path.join(
             os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai.tsv"
         )
+    if tmp:
+        df = pl.concat(tmp)
+
         df.write_csv(outfile, separator="\t")
         logger.info(f"{outfile} updated")
     else:
         logger.info(f"all tables are empty")
+        Path(outfile).touch()
 
     # Remove temporary TSV files
     for file in tmp_files:
@@ -997,11 +1001,11 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     tmp = [i for i in tmp if not i.is_empty()]
-    if tmp:
-        df = pl.concat(tmp)
-        outfile = os.path.join(
+    outfile = os.path.join(
             os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api.tsv"
         )
+    if tmp:
+        df = pl.concat(tmp)
         df.write_csv(outfile, separator="\t")
         logger.info(f"{outfile} updated")
     else:
@@ -1010,6 +1014,7 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     # Remove temporary TSV files
     for file in tmp_files:
         os.remove(file)
+        Path(outfile).touch()
 
 
 @utils.command(
