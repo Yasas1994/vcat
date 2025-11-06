@@ -168,51 +168,66 @@ n = [
     .alias("Species (binomial)"),
     pl.lit(None).alias("Species_score"),
 ]
+dfs = []
+matched = []
+try:
+    nuc = pl.read_csv(NUC, separator="\t")
 
-nuc = pl.read_csv(NUC, separator="\t")
-prot = pl.read_csv(PROT, separator="\t")
-prof = pl.read_csv(PROF, separator="\t")
-
-nuc = (
-    nuc.filter((pl.col("qcov") > 0.7) & (pl.col("ani") > 0.7))
-    .group_by("query")
-    .agg(
-        pl.all().top_k_by("tani", 1),
+    nuc = (
+        nuc.filter((pl.col("qcov") > 0.7) & (pl.col("ani") > 0.7))
+        .group_by("query")
+        .agg(
+            pl.all().top_k_by("tani", 1),
+        )
+        .explode(pl.all().exclude("query"))
+        .rename({"query": "seqid", "qlen": "qseqlen"})
     )
-    .explode(pl.all().exclude("query"))
-    .rename({"query": "seqid", "qlen": "qseqlen"})
-)
 
-nuc = nuc.with_columns(pl.lit("ani").alias("Method")).rename(
-    {"tani": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
-)
-prot = prot.with_columns(pl.lit("aai").alias("Method")).rename(
-    {"taai": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
-)
-prof = prof.with_columns(pl.lit("api").alias("Method")).rename(
-    {"tapi": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
-)
+    nuc = nuc.with_columns(pl.lit("ani").alias("Method")).rename(
+        {"tani": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
+    )
+    matched = nuc["SequenceID"].to_list()
+    dfs.append(nuc)
+except Exception as e:
+    logger.info("no nucleotide level results to merge")
 
-matched = nuc["SequenceID"].to_list()
-prot = prot.filter(~pl.col("SequenceID").is_in(matched))
-matched.extend(prot["SequenceID"].to_list())
-prof = prof.filter(~pl.col("SequenceID").is_in(matched))
-matched.extend(prof["SequenceID"].to_list())
+try:
+    prot = pl.read_csv(PROT, separator="\t")
 
+    prot = prot.with_columns(pl.lit("aai").alias("Method")).rename(
+        {"taai": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
+    )
+    prot = prot.filter(~pl.col("SequenceID").is_in(matched))
+    matched.extend(prot["SequenceID"].to_list())
+    dfs.append(prot)
+
+except Exception as e:
+    logger.info("no protein level results to merge")
+
+try:
+    prof = pl.read_csv(PROF, separator="\t")
+    prof = prof.with_columns(pl.lit("api").alias("Method")).rename(
+        {"tapi": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
+    )
+
+    prof = prof.filter(~pl.col("SequenceID").is_in(matched))
+    matched.extend(prof["SequenceID"].to_list())
+    dfs.append(prof)
+
+except Exception as e:
+    logger.info("no protein level results to merge")
+    
 # write a ictv taxonomy challange formatted file - this will be removed later
 pl.concat(
     [
-        nuc.with_columns(*n).select(keys),
-        prot.with_columns(*n).select(keys),
-        prof.with_columns(*n).select(keys),
+        i.with_columns(*n).select(keys)  for i in dfs
     ]
 ).write_csv(OUTFILE.rstrip(".tsv") + "_ictv.csv", separator=",")
 
 # write a file with more information
 pl.concat(
     [
-        nuc.with_columns(*n).select(keys_full),
-        prot.with_columns(*n).select(keys_full),
-        prof.with_columns(*n).select(keys_full),
+
+        i.with_columns(*n).select(keys_full) for i in dfs
     ]
 ).write_csv(OUTFILE, separator="\t")
