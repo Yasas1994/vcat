@@ -670,7 +670,7 @@ def ani(input, header, ani, tani, qcov, all, batch):
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     tmp = [i for i in tmp if not i.is_empty()]
     if tmp:
-        df = pl.concat([i for i in tmp if not i.is_empty()])
+        df = pl.concat(tmp)
         outfile = os.path.join(
             os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv"
         )
@@ -837,10 +837,9 @@ def aai(
 
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
-    df = pl.concat([i for i in tmp if not i.is_empty()])
     tmp = [i for i in tmp if not i.is_empty()]
     if tmp:
-        df = pl.concat([i for i in tmp if not i.is_empty()])
+        df = pl.concat(tmp)
         outfile = os.path.join(
             os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai.tsv"
         )
@@ -997,10 +996,9 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
 
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
-    df = pl.concat([i for i in tmp if not i.is_empty()])
     tmp = [i for i in tmp if not i.is_empty()]
     if tmp:
-        df = pl.concat([i for i in tmp if not i.is_empty()])
+        df = pl.concat(tmp)
         outfile = os.path.join(
             os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api.tsv"
         )
