@@ -10,16 +10,21 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 from vcat.utils import ani_summary, axi_summary, index_m8, load_chunk
 from .color_logger import logger
-
+from importlib.metadata import version, PackageNotFoundError
 
 
 # Define the directory containing the pipeline files
 PIPELINE_DIR = os.path.join(os.path.dirname(__file__), "./pipeline")
-VERSION = "0.0.1b"
 CONFIG = os.path.join(PIPELINE_DIR, "config.yaml")
 HEADER = "query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage"
 CONFIG_CONTENT = yaml.safe_load(open(CONFIG, "r"))
 
+
+try:
+    __version__ = version("vcat")
+except PackageNotFoundError:
+    # package is not installed
+    pass
 def load_configfile(file_path):
     with open(file_path, "r") as f:
         return yaml.safe_load(f)
@@ -101,7 +106,7 @@ def update_config(config_path, data: dict):
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
-@click.version_option("0.0.1a")
+@click.version_option(__version__)
 @click.pass_context
 def cli(obj):
     r"""
@@ -154,6 +159,13 @@ def cli(obj):
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="dir to vcat database",
     required=False,
+)
+@click.option(
+    "--nuc_search",
+    type=click.Choice(["blastn", "tbalstx", "mmseqs_blastn", "mmseqs_tblastx"]),
+    default="mmseqs_blastn",
+    show_default=True,
+    help="nucelotide seach algorithm (blasn, tblastx, mmseqs_blastn, mmseqs_tblastx).",
 )
 @click.option(
     "-j",
@@ -277,7 +289,7 @@ def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwar
     Most snakemake arguments can be appended to the command for more info see 'snakemake --help'
     """
 
-    logger.info(f"vcat version: {VERSION}")
+    logger.info(f"vcat version: {__version__}")
     conf = load_configfile(CONFIG)
     if database:
         db_dir = database
@@ -380,7 +392,7 @@ def reads(input, output, jobs, profile, dryrun, snakemake_args):
     Most snakemake arguments can be appended to the command for more info see 'snakemake --help'
     """
 
-    logger.info(f"vcat version: {VERSION}")
+    logger.info(f"vcat version: {__version__}")
 
     conf = load_configfile(CONFIG)
     db_dir = conf["database_dir"]
@@ -654,14 +666,18 @@ def ani(input, header, ani, tani, qcov, all, batch):
                 logger.exception(status)
                 exit(1)
 
-    logger.info("merging temporary files")
+    logger.info("trying to merge temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
-    df = pl.concat([i for i in tmp if not i.is_empty()])
-    outfile = os.path.join(
-        os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv"
-    )
-    df.write_csv(outfile, separator="\t")
-    logger.info(f"{outfile} updated")
+    tmp = [i for i in tmp if not i.is_empty()]
+    if tmp:
+        df = pl.concat([i for i in tmp if not i.is_empty()])
+        outfile = os.path.join(
+            os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv"
+        )
+        df.write_csv(outfile, separator="\t")
+        logger.info(f"{outfile} updated")
+    else:
+        logger.info(f"all tables are empty")
 
     # Remove temporary TSV files
     for file in tmp_files:
@@ -822,12 +838,16 @@ def aai(
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
-    outfile = os.path.join(
-        os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai.tsv"
-    )
-
-    df.write_csv(outfile, separator="\t")
-    logger.info(f"{outfile} updated")
+    tmp = [i for i in tmp if not i.is_empty()]
+    if tmp:
+        df = pl.concat([i for i in tmp if not i.is_empty()])
+        outfile = os.path.join(
+            os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai.tsv"
+        )
+        df.write_csv(outfile, separator="\t")
+        logger.info(f"{outfile} updated")
+    else:
+        logger.info(f"all tables are empty")
 
     # Remove temporary TSV files
     for file in tmp_files:
@@ -978,11 +998,16 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     df = pl.concat([i for i in tmp if not i.is_empty()])
-    outfile = os.path.join(
-        os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api.tsv"
-    )
-    df.write_csv(outfile, separator="\t")
-    logger.info(f"{outfile} updated")
+    tmp = [i for i in tmp if not i.is_empty()]
+    if tmp:
+        df = pl.concat([i for i in tmp if not i.is_empty()])
+        outfile = os.path.join(
+            os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api.tsv"
+        )
+        df.write_csv(outfile, separator="\t")
+        logger.info(f"{outfile} updated")
+    else:
+        logger.info(f"all tables are empty")
 
     # Remove temporary TSV files
     for file in tmp_files:
