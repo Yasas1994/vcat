@@ -165,7 +165,21 @@ def cli(obj):
     type=click.Choice(["blastn", "tbalstx", "mmseqs_blastn", "mmseqs_tblastx"]),
     default="mmseqs_blastn",
     show_default=True,
-    help="nucelotide seach algorithm (blasn, tblastx, mmseqs_blastn, mmseqs_tblastx).",
+    help="nucelotide search algorithm (blastn, tblastx, mmseqs_blastn, mmseqs_tblastx).",
+)
+@click.option(
+    "--prot_search",
+    type=click.Choice(["blast", "diamond", "mmseqs"]),
+    default="mmseqs",
+    show_default=True,
+    help="protein search algorithm (blast, diamond, mmseqs).",
+)
+@click.option(
+    "--prof_search",
+    type=click.Choice(["mmseqs", "hmmer"]),
+    default="mmseqs",
+    show_default=True,
+    help="nucelotide seach algorithm (mmseqs, hmmer).",
 )
 @click.option(
     "-j",
@@ -311,7 +325,7 @@ def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwar
         " --scheduler greedy "
         " --show-failed-logs "
         " --groups group1=1 "
-        " --config database_dir='{db_dir}' sample='{input}' output_dir='{output}' api='{api_params}' aai='{aai_params}' ani='{ani_params}' batch='{batch}'"
+        " --config database_dir='{db_dir}' sample='{input}' output_dir='{output}' api='{api_params}' aai='{aai_params}' ani='{ani_params}' batch='{batch}' nuc_search='{nuc_search}'"
         " {args}"
     ).format(
         snakefile=get_snakefile("./pipeline/Snakefile"),
@@ -320,6 +334,7 @@ def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwar
         aai_params=taai_parms,
         api_params=tapi_params,
         ani_params=ani_params,
+        nuc_search=kwargs.get('nuc_search'),
         batch=batch,
         db_dir=db_dir,
         input=input,
