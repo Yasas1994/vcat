@@ -62,6 +62,63 @@ from numpy.typing import NDArray
 
 # polars implementation: fast!
 
+def merge_intervals_with_cutoff(intervals, cutoff=0):
+    """
+    Merge intervals if the distance between consecutive (sorted) ranges is
+    less than or equal to `cutoff`.
+
+    Parameters
+    ----------
+    intervals : array-like of shape (n, 2)
+        Each row is [start, end]. Start may be > end; we'll sort each pair.
+        Works with ints or floats.
+    cutoff : float or int, default=0
+        Maximum allowed gap between two ranges to still merge them.
+        Gap is defined as next_start - current_merged_end.
+        Overlapping ranges have negative or zero gap and always merge.
+
+    Returns
+    -------
+    np.ndarray of shape (m, 2)
+        Merged intervals, sorted by start.
+
+    Notes
+    -----
+    * Distance/gap uses continuous semantics: gap = next_start - current_end.
+      Example: [0, 2] and [3, 5] have gap 1. With cutoff >= 1 they merge.
+    * If you want discrete (integer) semantics where touching intervals
+      should merge (e.g., [0,2] and [3,5] merge with cutoff=0), pass cutoff=1.
+    """
+    arr = np.asarray(intervals, dtype=int).copy()
+    if arr.size == 0:
+        return arr.reshape(0, 2)
+
+    # Ensure each interval is [min, max]
+    arr.sort(axis=1)
+
+    # Sort by start, then end for stability
+    order = np.lexsort((arr[:, 1], arr[:, 0]))
+    arr = arr[order]
+
+    merged = []
+    cur_start, cur_end = arr[0]
+
+    for s, e in arr[1:]:
+        # If within cutoff (including overlaps), extend the current interval
+        gap = s - cur_end
+        if gap <= cutoff:
+            # merge
+            if e > cur_end:
+                cur_end = e
+        else:
+            # finalize current and start new
+            merged.append([cur_start, cur_end])
+            cur_start, cur_end = s, e
+
+    merged.append([cur_start, cur_end])
+    out = np.array(merged, dtype=arr.dtype)
+    return out
+
 
 def merge_intervals(
     intervals: NDArray,

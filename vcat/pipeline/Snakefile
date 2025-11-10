@@ -13,6 +13,7 @@ OUTDIR = config["output_dir"]
 API_PARAMS = config["api"]
 AAI_PARAMS = config["aai"]
 ANI_PARAMS = config["ani"]
+NUC_SEARCH = config["nuc_search"]
 
 # Define database paths
 PROTDB = f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins"
@@ -88,11 +89,20 @@ rule annot_nuc:
         db=GENOMEDB,
         tmp=temp(f"{OUTDIR}/tmp/nuc"),
     threads: int(workflow.cores * 0.75)
-    shell:
-        """
-        mmseqs easy-search {input} {params.db} {output.out} {params.tmp} --threads {threads} -s 7 --search-type 3\
-        --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
-        """
+    run:
+        
+        if NUC_SEARCH == "mmseqs_blastn":
+                shell("""
+                mkdir -p {params.tmp}
+                mmseqs easy-search {input} {params.db} {output.out} {params.tmp} --threads {threads} -s 7 --search-type 3\
+                --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
+                """)
+        elif NUC_SEARCH == "mmseqs_tblastx":
+                shell("""
+                mkdir -p {params.tmp}
+                mmseqs easy-search {input} {params.db} {output.out} {params.tmp} --threads {threads} -s 7 --search-type 2\
+                --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
+                """)
 
 rule split_fasta:
     input:
@@ -169,6 +179,7 @@ rule annot_prot:
         mem='30G'
     shell:
         """ 
+        mkdir -p {params.tmp}
         mmseqs easy-search {input} {params.db} {output.out} {params.tmp} --threads {threads} -s 6  --split-memory-limit {resources.mem}\
         --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
         """
@@ -190,6 +201,7 @@ rule annot_prof:
         mem='30G'
     shell:
         """ 
+        mkdir -p {params.tmp}
         mmseqs easy-search {input} {params.db} {output} {params.tmp} --threads {threads} -s 7 --split-memory-limit {resources.mem}\
         --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
         
