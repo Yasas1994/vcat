@@ -63,14 +63,94 @@ from numpy.typing import NDArray
 # polars implementation: fast!
 
 
-def merge_intervals(intervals: NDArray) -> NDArray:
-    """Merge overlapping intervals using numpy."""
-    starts = intervals[:, 0]
-    ends = np.maximum.accumulate(intervals[:, 1])
-    valid = np.zeros(len(intervals) + 1, dtype=bool)
-    valid[0], valid[-1] = True, True
-    valid[1:-1] = starts[1:] >= ends[:-1]
-    return np.vstack((starts[valid[:-1]], ends[valid[1:]])).T
+def merge_intervals(
+    intervals: NDArray,
+    *,
+    assume_sorted: bool = False,
+    merge_touches: bool = True,
+    normalize: str = "swap",          # "swap" | "drop" | "error" for start>end
+    keep_empty: bool = True,          # keep intervals where start==end
+) -> NDArray:
+    """
+    Merge overlapping (and optionally touching) intervals using NumPy.
+
+    Parameters
+    ----------
+    intervals : (N, 2) array-like
+        Each row is [start, end]. May contain start >= end.
+    assume_sorted : bool, default False
+        If False, intervals are stably sorted by (start, end) before merging.
+    merge_touches : bool, default True
+        If True, [a,b] and [b,c] are merged; otherwise kept separate.
+    normalize : {"swap","drop","error"}, default "swap"
+        Handling for rows with start > end:
+          - "swap": swap endpoints (treat as [min, max]).
+          - "drop": remove those rows.
+          - "error": raise ValueError.
+    keep_empty : bool, default True
+        Keep zero-length intervals (start == end) after normalization.
+        If False, they are removed before merging.
+
+    Returns
+    -------
+    (M, 2) np.ndarray of merged, disjoint intervals.
+    """
+    arr = np.asarray(intervals)
+    if arr.ndim != 2 or arr.shape[1] != 2:
+        raise ValueError("`intervals` must be a (N, 2) array-like.")
+    if arr.size == 0:
+        return np.empty((0, 2), dtype=arr.dtype)
+
+    if np.issubdtype(arr.dtype, np.floating) and np.isnan(arr).any():
+        raise ValueError("`intervals` contains NaN values.")
+
+    starts, ends = arr[:, 0], arr[:, 1]
+    rev_mask = starts > ends
+    if rev_mask.any():
+        if normalize == "error":
+            raise ValueError("Found rows with start > end.")
+        elif normalize == "drop":
+            keep = ~rev_mask
+            starts, ends = starts[keep], ends[keep]
+        elif normalize == "swap":
+            s, e = np.minimum(starts, ends), np.maximum(starts, ends)
+            starts, ends = s, e
+        else:
+            raise ValueError("normalize must be one of {'swap','drop','error'}")
+
+    # zero-length handling
+    if not keep_empty:
+        keep = starts != ends
+        starts, ends = starts[keep], ends[keep]
+
+    if starts.size == 0:
+        return np.empty((0, 2), dtype=arr.dtype)
+
+    # sort if needed
+    if not assume_sorted:
+        idx = np.lexsort((ends, starts))
+        starts, ends = starts[idx], ends[idx]
+
+    # cumulative max trick over ends to detect group boundaries
+    cummax_ends = np.maximum.accumulate(ends)
+
+    # boundary condition depends on whether touches merge
+    if merge_touches:
+        separators = starts[1:] > cummax_ends[:-1]
+    else:
+        separators = starts[1:] >= cummax_ends[:-1]
+
+    # valid mask (length N+1) with True at group boundaries
+    n = starts.size
+    valid = np.empty(n + 1, dtype=bool)
+    valid[0] = True
+    valid[-1] = True
+    valid[1:-1] = separators
+
+    merged_starts = starts[valid[:-1]]
+    merged_ends   = cummax_ends[valid[1:]]  # cummax at group ends
+
+    return np.column_stack((merged_starts, merged_ends))
 
 
 def compute_cov(alns: List[pl.Series]) -> float:
