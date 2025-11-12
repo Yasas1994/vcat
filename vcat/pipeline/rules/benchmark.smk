@@ -48,7 +48,7 @@ rule cal_ani:
         filter
         vcat utils ani -i {input} \
         --header query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage \
-        --level {params.level} --dbdir {params.dbdir} --batch {params.batch} {params.ani} &> {log}
+        --level {params.level} --dbdir {params.db} --batch {params.batch} {params.ani} &> {log}
         """
 
 rule cal_aai:
