@@ -1144,13 +1144,6 @@ def fragment(input, header, min, max, batch, dbdir, gff):
     required=True,
 )
 @click.option(
-    "--batch",
-    type=int,
-    default=5000,
-    help="number of records to process at a time",
-    required=False,
-)
-@click.option(
     "--tapif",
     type=float,
     default=0.3,
@@ -1285,7 +1278,7 @@ def benchmark(dbdir, results, batch, level, snakemake_args, **kwargs):
         " --scheduler greedy "
         " --show-failed-logs "
         " --groups group1=1 "
-        " --config database_dir='{db_dir}' results='{results}' batch='{batch}' ani='{ani_params} aai='{aai_params} api='{api_params}' level='{level}'"
+        " --config database_dir='{db_dir}' results='{results}' batch='{batch}' ani='{ani_params}' aai='{aai_params}' api='{api_params}' level='{level}'"
         " {args}"
     ).format(
         snakefile=get_snakefile("./pipeline/rules/benchmark.smk"),
