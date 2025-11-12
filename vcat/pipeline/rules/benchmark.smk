@@ -5,7 +5,7 @@ import os
 
 # Extract global variables from the config
 DBDIR = config["database_dir"]
-INFILES = config["results"]  # This can be a list of files
+OUTDIR = config["results"]
 API_PARAMS = config["api"]
 AAI_PARAMS = config["aai"]
 ANI_PARAMS = config["ani"]
@@ -16,19 +16,6 @@ BATCH = config["batch"]
 PROTDB = f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins"
 GENOMEDB = f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes"
 PROFDB = f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles"
-INDIR = os.path.dirname(INFILES)
-
-
-# Function to dynamically generate output files
-def generate_outputs(wildcards):
-    return f"{OUTDIR}/{wildcards.sample}_genome.m8"
-
-
-# Function to dynamically generate input files
-def generate_inputs(wildcards):
-    directory_ = os.path.dirname(INFILES)
-    file_name, file_extension = os.path.splitext(os.path.basename(INFILES))
-    return os.path.join(directory_, f"{wildcards.sample}{file_extension}")
 
 
 # Rule to define final output
