@@ -221,11 +221,14 @@ def compute_cov(alns: List[pl.Series]) -> float:
 # ** Process the grouped data **
 def ani_summary(infile: Union[str, StringIO], 
                 all: bool, 
-                header: list) -> Union[Any, Exception]:
+                header: list,
+                dbdir: str = None,
+                level: str = None) -> Union[Any, Exception]:
     """
     Robust per-group ANI summary that avoids list[f64] issues in Polars by
     grouping via pandas and computing scalar aggregates per (query,target).
     """
+   
     try:
         mmseqs_nuc = pl.read_csv(
             infile,
@@ -248,7 +251,38 @@ def ani_summary(infile: Union[str, StringIO],
         mmseqs_nuc = mmseqs_nuc.filter(
             pl.col("alnlen").is_not_null() & pl.col("fident").is_not_null()
         )
+        if (dbdir and level):
+            taxdb = TaxDb(
+                    nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
+                    names_dmp=f"{dbdir}/ictv-taxdump/names.dmp",
+                    merged_dmp=f"{dbdir}/ictv-taxdump/merged.dmp",
+                )
+            # accession	accession.version	taxid	gi
+            qtaxinfo = pl.read_csv(f"{dbdir}/VMR_latest/virus_genome.accession2taxid",
+                                                has_header=True, 
+                                                separator="\t",
+                                                new_columns=["query", "query_version", "taxid", "gi" ])
 
+            mmseqs_nuc = mmseqs_nuc.filter(
+                pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).rank_taxid_dictionary.get(level), return_dtype=pl.Int64).alias("ttaxrank")
+            )
+            qtaxinfo = qtaxinfo.with_columns(
+                pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).alias("qtaxlineage"))
+            )
+            qtaxinfo = qtaxinfo.with_columns(
+                pl.col("qtaxlineage").map_elements(lambda x : x.rank_taxid_dictionary.get(level), return_dtype=pl.Int64).alias("qtaxrank")
+            )
+            # add qtaxonomic info
+            
+            mmseqs_nuc = qtaxinfo.select(cs.by_name(["query","qtaxrank"])).join(
+                mmseqs_nuc, on="query", how="right"
+            )
+            # filter level
+            mmseqs_nuc = mmseqs_nuc.filter(
+                pl.col("qtaxrank") != pl.col("ttaxrank")
+            )
+
+        # drop 
         # convert to pandas for reliable group iteration
         # pdf = mmseqs_nuc.to_pandas()
         rows = []
@@ -315,7 +349,6 @@ def ani_summary(infile: Union[str, StringIO],
 
 # aai calculation code
 
-
 def trim_lineage(taxid: int,
                  taxdb: TaxDb,
                  taxomic_level: str = "species"
@@ -374,7 +407,7 @@ def cal_axi(
         #     pl.all().sort_by(tkind).last(),
         # )
     )
-    if all == False:
+    if not all:
         tmp = tmp.group_by("seqid").agg(
                 pl.all().sort_by(tkind).last(),
             )
@@ -405,6 +438,7 @@ def axi_summary(
     top_k: int,
     kind: str,
     all: bool,
+    level: str = None,
 ) -> Union[pl.DataFrame, Exception]:
     # ps: optimized for speed not for readability
 
@@ -527,6 +561,29 @@ def axi_summary(
         pl.col("qlen").unique().alias("qlens")
     )
     mmseqs_axi = mmseqs_axi.join(seqid2qlens, on="seqid", how="left")
+    if (dbdir and level):
+            # add qtaxonomic info
+            # filter level
+            # accession	accession.version	taxid	gi
+            qtaxinfo = pl.read_csv(f"{dbdir}/VMR_latest/virus_genome.accession2taxid",
+                                                has_header=True, 
+                                                separator="\t",
+                                                new_columns=["seqid", "seqid_version", "taxid", "gi" ])
+            qtaxinfo = qtaxinfo.with_columns(
+                pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).alias("qlineage"))
+            )
+            qtaxinfo = qtaxinfo.with_columns(
+                pl.col("qtaxlineage").map_elements(lambda x : x.rank_taxid_dictionary.get(level), return_dtype=pl.Int64).alias("qtaxrank")
+            )
+            # add qtaxonomic info
+            # filter level
+            mmseqs_axi = qtaxinfo.select(cs.by_name(["accession","qtaxrank"])).join(
+                mmseqs_axi, on="seqid", how="right"
+            )
+            mmseqs_axi = mmseqs_axi.filter(
+                pl.col("qtaxrank") != pl.col(level)
+            )
+
 
     try:
         results = []

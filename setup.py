@@ -35,11 +35,14 @@ setup(
     entry_points={"console_scripts": ["vcat = vcat.cli:cli"]},
     classifiers=["Topic :: Scientific/Engineering :: Bio-Informatics"],
     scripts=[
+        "scripts/add_lineage_to_blast_out.py",
         "scripts/correct_profile_taxinfo.py",
         "scripts/get_cluster_lca.py",
         "scripts/download_gb.py",
         "scripts/ictv_out.py",
         "scripts/postprocess.py",
         "scripts/prepare.py",
+        "scripts/remove_empty_records.py",
+
     ],
 )

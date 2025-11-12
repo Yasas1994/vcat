@@ -576,7 +576,7 @@ def downloaddb(db_dir, dbversion, snakemake_args):
 
 # utility functions
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
-@click.version_option("0.0.1a")
+@click.version_option(__version__)
 @click.pass_context
 def utils(obj):
     """
@@ -643,17 +643,35 @@ def utils(obj):
     required=False,
 )
 @click.option(
+    "--level",
+    type=str,
+    default=None,
+    help="leave out taxonomic level (species, genus, family, class)",
+    required=False,
+)
+@click.option(
+    "-d",
+    "--dbdir",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="path to the ref databases",
+    required=False,
+)
+@click.option(
     "--batch",
     type=int,
     default=5000,
     help="number of records to process at a time",
     required=False,
 )
-def ani(input, header, ani, tani, qcov, all, batch):
+def ani(input, header, ani, tani, qcov, level, dbdir, all, batch):
     """
     calculates the average nucleotide identity and coverage of a query sequence
     to the best
     """
+    if (level or dbdir) and not (level and dbdir):
+            logger.error(f"{level} and {dbdir} are mutually inclusive")
+            exit(1)
+
 
     CHUNK_SIZE = batch
     file_name = os.path.basename(input)
@@ -669,7 +687,7 @@ def ani(input, header, ani, tani, qcov, all, batch):
                 os.path.dirname(input),
                 f"{os.path.splitext(file_name)[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv",
             )
-            status = ani_summary(finput, all=all, header=header)
+            status = ani_summary(finput, all=all, header=header, level=level, dbdir=dbdir)
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile, separator="\t")
                 logger.info(f"{outfile} updated")
@@ -803,6 +821,13 @@ def ani(input, header, ani, tani, qcov, all, batch):
     required=False,
 )
 @click.option(
+    "--level",
+    type=str,
+    default=None,
+    help="leave out taxonomic level (species, genus, family, class)",
+    required=False,
+)
+@click.option(
     "--all",
     is_flag=True,
     default=False,
@@ -810,7 +835,7 @@ def ani(input, header, ani, tani, qcov, all, batch):
     required=False,
 )
 def aai(
-    input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk, all
+    input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk, level, all
 ):
     """
     calculates the average aminoacid identity and coverage of a query sequence
@@ -839,7 +864,7 @@ def aai(
                 f"{os.path.splitext(file_name)[0]}_aai_{min(i + CHUNK_SIZE, len(index))}.tsv",
             )
             status = axi_summary(
-                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="aai", all=all
+                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="aai", all=all, level=level
             )
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile, separator="\t")
@@ -967,13 +992,20 @@ def aai(
     required=False,
 )
 @click.option(
+    "--level",
+    type=str,
+    default=None,
+    help="leave out taxonomic level (species, genus, family, class)",
+    required=False,
+)
+@click.option(
     "--all",
     is_flag=True,
     default=False,
     help="get api for all top-k hits per query sequence. by default only outputs the besthit",
     required=False,
 )
-def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk, all):
+def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk, level, all):
     """
     calculates the average profile identity and coverage of a query sequence
     to the genomes in the target database
@@ -1000,7 +1032,7 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
                 f"{os.path.splitext(file_name)[0]}_api_{min(i + CHUNK_SIZE, len(index))}.tsv",
             )
             status = axi_summary(
-                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="api", all=all
+                finput, gff, dbdir, header, THRESHOLDS, top_k=topk, kind="api", level=level, all=all
             )
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile, separator="\t")
@@ -1079,6 +1111,202 @@ def fragment(input, header, min, max, batch, dbdir, gff):
     """
     pass
 
+@utils.command(
+    context_settings=dict(ignore_unknown_options=True),
+    help="""
+    benchmark the performance by leaving out taxa. Suppose target X belongs to taxon Y 
+    we remove all query hits to taxon Y and calculate the axi to the taxa belonging to remianing hits.
+
+    vcat contigs -i <genomes_used_to_build_db> -d <db> -o <results_dir>
+
+    vcat utils benchmark --dbdir <path> --results <results_dir>
+    """,
+)
+@click.option(
+    "-d",
+    "--dbdir",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="database directory",
+    required=True,
+)
+@click.option(
+    "-r",
+    "--results",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="this directory should contain vcat results",
+    required=True,
+)
+@click.option(
+    "-l",
+    "--level",
+    type=str,
+    help="taxonomic level to leave out (species, genus, family, class)",
+    required=True,
+)
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False,
+)
+@click.option(
+    "--tapif",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to families",
+    required=False,
+)
+@click.option(
+    "--tapio",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to orders",
+    required=False,
+)
+@click.option(
+    "--tapic",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to classes",
+    required=False,
+)
+@click.option(
+    "--tapip",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to phyla",
+    required=False,
+)
+@click.option(
+    "--tapik",
+    type=float,
+    default=0.3,
+    help="assign sequences above this tapi threshold to kingdoms",
+    required=False,
+)
+@click.option(
+    "--taaig",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to genera",
+    required=False,
+)
+@click.option(
+    "--taaif",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to families",
+    required=False,
+)
+@click.option(
+    "--taaio",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to orders",
+    required=False,
+)
+@click.option(
+    "--taaic",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to classes",
+    required=False,
+)
+@click.option(
+    "--taaip",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to phyla",
+    required=False,
+)
+@click.option(
+    "--taaik",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to kingdoms",
+    required=False,
+)
+@click.option(
+    "--ani",
+    type=float,
+    default=0.7,
+    help="filter out sequences below this ani threshold (ani)",
+    required=False,
+)
+@click.option(
+    "--qcov",
+    type=float,
+    default=0.7,
+    help="filter out sequences below this qcov threshold (ani)",
+    required=False,
+)
+@click.option(
+    "--batch",
+    type=int,
+    default=5000,
+    help="number of records to process at a time",
+    required=False,
+)
+@click.option(
+    "-n",
+    "--dryrun",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Test execution.",
+)
+
+@click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
+def benchmark(dbdir, results, batch, level, snakemake_args, **kwargs):
+    """
+    benchmark the performance by leaving out taxa. Suppose target X belongs to taxon Y 
+    we remove all query hits to taxon Y and calculate the axi to the taxa belonging to remianing hits.
+
+    vcat contigs -i <genomes_used_to_build_db> -d <db> -o <results_dir>
+
+    vcat utils benchmark --dbdir <path> --results <results_dir>
+    """
+    pass
+    logger.info(f"vcat version: {__version__}")
+    taai_parms = ""
+    tapi_params = ""
+    ani_params = f" --ani {kwargs['ani']} --qcov {kwargs['qcov']}"
+    for k, v in kwargs.items():
+        if k.startswith("taai"):
+            taai_parms += f" --{k} {v}"
+        elif k.startswith("tapi"):
+            tapi_params += f" --{k} {v}"
+
+    jobs = kwargs.get("jobs", 4)
+    cmd = (
+        "snakemake --snakefile {snakefile} "
+        " --jobs {jobs} --rerun-incomplete "
+        " --scheduler greedy "
+        " --show-failed-logs "
+        " --groups group1=1 "
+        " --config database_dir='{db_dir}' results='{results}' batch='{batch}' ani='{ani_params} aai='{aai_params} api='{api_params}' level='{level}'"
+        " {args}"
+    ).format(
+        snakefile=get_snakefile("./pipeline/rules/benchmark.smk"),
+        jobs=jobs,
+        batch=batch,
+        db_dir=dbdir,
+        results=results,
+        aai_params=taai_parms,
+        api_params=tapi_params,
+        ani_params=ani_params,
+        level=level,
+        args=" ".join(snakemake_args),
+    )
+    logger.info(cmd)
+    logger.debug("Executing: %s" % cmd)
+    try:
+        subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as e:
+        # removes the traceback
+        logger.critical(e)
+        exit(1)
 
 cli.add_command(utils)
 
