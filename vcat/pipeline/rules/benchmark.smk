@@ -21,18 +21,17 @@ PROFDB = f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles"
 # Rule to define final output
 rule all:
     input:
-        f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
-        f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
-        f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof_leaveout_{LEVEOUT_LEVEL}_api.tsv",
-    
+        f"{OUTDIR}/nuc/{{sample}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
+        f"{OUTDIR}/prot/{{sample}}__prot_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
+        f"{OUTDIR}/prof/{{sample}}_prof_leaveout_{LEVEOUT_LEVEL}_api.tsv"    
 
 rule cal_ani:
     input:
-        f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome.m8"
+        f"{OUTDIR}/nuc/{{sample}}_genome.m8"
     output:
-        f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv"
+        f"{OUTDIR}/nuc/{{sample}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv"
     log:
-        f"{OUTDIR}/logs/{{sample}}_{{ext}}_leaveout_ani.log"
+        f"{OUTDIR}/logs/{{sample}}_leaveout_ani.log"
     params:
         batch = BATCH,
         ani = ANI_PARAMS,
@@ -48,12 +47,12 @@ rule cal_ani:
 
 rule cal_aai:
     input:
-        m8 = f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot.m8",
-        gff = f"{OUTDIR}/prot/{{sample}}_{{ext}}.gff"
+        m8 = f"{OUTDIR}/prot/{{sample}}_prot.m8",
+        gff = f"{OUTDIR}/prot/{{sample}}.gff"
     output:
-        f"{OUTDIR}/prot/{{sample}}_{{ext}}_leaveout_{LEVEOUT_LEVEL}_prot_aai.tsv"
+        f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prot_aai.tsv"
     log:
-        f"{OUTDIR}/logs/{{sample}}_{{ext}}_leaveout_aai.log"
+        f"{OUTDIR}/logs/{{sample}}_leaveout_aai.log"
     params:
         batch = BATCH,
         aai = AAI_PARAMS,
@@ -68,12 +67,12 @@ rule cal_aai:
 
 rule cal_api:
     input:
-        m8 = f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof.m8",
-        gff = f"{OUTDIR}/prot/{{sample}}_{{ext}}.gff"
+        m8 = f"{OUTDIR}/prof/{{sample}}_prof.m8",
+        gff = f"{OUTDIR}/prot/{{sample}}.gff"
     output:
-        f"{OUTDIR}/prof/{{sample}}_{{ext}}_leaveout_{LEVEOUT_LEVEL}_prof_api.tsv"
+        f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prof_api.tsv"
     log:
-        f"{OUTDIR}/logs/{{sample}}_{{ext}}_leaveout_api.log"
+        f"{OUTDIR}/logs/{{sample}}_leaveout_api.log"
     params:
         batch = BATCH,
         api = API_PARAMS,
@@ -89,14 +88,14 @@ rule cal_api:
 rule summarize:
     input:
         DATADIR = DBDIR,
-        PROF = f"{OUTDIR}/prof/{{sample}}_{{ext}}_leaveout_{LEVEOUT_LEVEL}_prof_api.tsv",
-        PROT = f"{OUTDIR}/prot/{{sample}}_{{ext}}_leaveout_{LEVEOUT_LEVEL}_prot_aai.tsv",
-        NUC = f"{OUTDIR}/nuc/{{sample}}_{{ext}}_leaveout_{LEVEOUT_LEVEL}_genome_ani.tsv",
+        PROF = f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prof_api.tsv",
+        PROT = f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prot_aai.tsv",
+        NUC = f"{OUTDIR}/nuc/{{sample}}_leaveout_{LEVEOUT_LEVEL}_genome_ani.tsv",
 
     output:
-        f"{OUTDIR}/results/{{sample}}_{{ext}}_leaveout_{LEVEOUT_LEVEL}.tsv"
+        f"{OUTDIR}/results/{{sample}}_leaveout_{LEVEOUT_LEVEL}.tsv"
     log:
-        f"{OUTDIR}/logs/{{sample}}_{{ext}}_leaveout_summarize.log"
+        f"{OUTDIR}/logs/{{sample}}_leaveout_summarize.log"
 
     threads: int(workflow.cores * 0.75)
 
