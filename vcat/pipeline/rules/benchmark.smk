@@ -35,7 +35,7 @@ rule cal_ani:
     input:
         f"{OUTDIR}/nuc/{{sample}}_genome.m8"
     output:
-        f"{OUTDIR}/nuc/{{sample}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv"
+        f"{OUTDIR}/nuc/{{sample}}_leaveout_{LEVEOUT_LEVEL}_ani.tsv"
     log:
         f"{OUTDIR}/logs/{{sample}}_leaveout_ani.log"
     params:
@@ -56,7 +56,7 @@ rule cal_aai:
         m8 = f"{OUTDIR}/prot/{{sample}}_prot.m8",
         gff = f"{OUTDIR}/prot/{{sample}}.gff"
     output:
-        f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prot_aai.tsv"
+        f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_aai.tsv"
     log:
         f"{OUTDIR}/logs/{{sample}}_leaveout_aai.log"
     params:
@@ -76,7 +76,7 @@ rule cal_api:
         m8 = f"{OUTDIR}/prof/{{sample}}_prof.m8",
         gff = f"{OUTDIR}/prot/{{sample}}.gff"
     output:
-        f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prof_api.tsv"
+        f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_api.tsv"
     log:
         f"{OUTDIR}/logs/{{sample}}_leaveout_api.log"
     params:
@@ -94,9 +94,9 @@ rule cal_api:
 rule summarize:
     input:
         DATADIR = DBDIR,
-        PROF = f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prof_api.tsv",
-        PROT = f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_prot_aai.tsv",
-        NUC = f"{OUTDIR}/nuc/{{sample}}_leaveout_{LEVEOUT_LEVEL}_genome_ani.tsv",
+        PROF = f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_api.tsv",
+        PROT = f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
+        NUC = f"{OUTDIR}/nuc/{{sample}}_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
 
     output:
         f"{OUTDIR}/results/{{sample}}_leaveout_{LEVEOUT_LEVEL}.tsv"
