@@ -21,15 +21,10 @@ PROFDB = f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles"
 # Rule to define final output
 rule all:
     input:
-        expand(f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
-        sample=[os.path.splitext(os.path.basename(INFILES))[0]],
-        ext=[os.path.basename(INFILES).split(".")[-1]]),
-        expand(f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
-        sample=[os.path.splitext(os.path.basename(INFILES))[0]],
-        ext=[os.path.basename(INFILES).split(".")[-1]]),
-        expand(f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof_leaveout_{LEVEOUT_LEVEL}_api.tsv",
-        sample=[os.path.splitext(os.path.basename(INFILES))[0]],
-        ext=[os.path.basename(INFILES).split(".")[-1]]),        
+        f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
+        f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
+        f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof_leaveout_{LEVEOUT_LEVEL}_api.tsv",
+    
 
 rule cal_ani:
     input:
