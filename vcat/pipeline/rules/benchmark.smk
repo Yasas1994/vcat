@@ -17,7 +17,7 @@ BATCH = config["batch"]
 PROTDB = f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins"
 GENOMEDB = f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes"
 PROFDB = f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles"
-SAMPLD = Path(glob(f"{OUTDIR}/nuc/*_genome.m8")).name.rstrip("_genome.m8")
+SAMPLD = Path(glob(f"{OUTDIR}/nuc/*_genome.m8")[0]).name.rstrip("_genome.m8")
 
 # Rule to define final output
 rule all:
