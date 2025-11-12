@@ -22,11 +22,13 @@ SAMPLD = Path(glob(f"{OUTDIR}/nuc/*_genome.m8")[0]).name.rstrip("_genome.m8")
 # Rule to define final output
 rule all:
     input:
-        expand(f"{OUTDIR}/nuc/{{sample}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
+        expand(f"{OUTDIR}/nuc/{{sample}}_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
         sample=SAMPLD),
-        expand(f"{OUTDIR}/prot/{{sample}}_prot_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
+        expand(f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
         sample=SAMPLD),
-        expand(f"{OUTDIR}/prof/{{sample}}_prof_leaveout_{LEVEOUT_LEVEL}_api.tsv",
+        expand(f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_api.tsv",
+        sample=SAMPLD),
+        expand(f"{OUTDIR}/results/{{sample}}_leaveout_{LEVEOUT_LEVEL}.tsv",
         sample=SAMPLD)
 
 rule cal_ani:
