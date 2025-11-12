@@ -2,7 +2,8 @@ from pathlib import Path
 import multiprocessing
 import subprocess
 import os
-
+from glob import glob
+from pathlib import Path
 # Extract global variables from the config
 DBDIR = config["database_dir"]
 OUTDIR = config["results"]
@@ -16,14 +17,17 @@ BATCH = config["batch"]
 PROTDB = f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins"
 GENOMEDB = f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes"
 PROFDB = f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles"
-
+SAMPLD = Path(glob(f"{OUTDIR}/nuc/*_genome.m8")).name.rstrip("_genome.m8")
 
 # Rule to define final output
 rule all:
     input:
-        f"{OUTDIR}/nuc/{{sample}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
-        f"{OUTDIR}/prot/{{sample}}__prot_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
-        f"{OUTDIR}/prof/{{sample}}_prof_leaveout_{LEVEOUT_LEVEL}_api.tsv"    
+        expand(f"{OUTDIR}/nuc/{{sample}}_genome_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
+        sample=SAMPLD),
+        expand(f"{OUTDIR}/prot/{{sample}}_prot_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
+        sample=SAMPLD),
+        expand(f"{OUTDIR}/prof/{{sample}}_prof_leaveout_{LEVEOUT_LEVEL}_api.tsv",
+        sample=SAMPLD)
 
 rule cal_ani:
     input:
