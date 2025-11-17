@@ -2,15 +2,19 @@
 """
 author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
 
-postprocesses genome.m8, protein.m8 and profile.m8 files by calculating
+postprocesses genome.m8, prot_dfein.m8 and prof_dfile.m8 files by calculating
 ani, aai, and api and summarizes the summarizes the taxonomy predictions
 to a single .tsv file
 
 """
 
 import polars as pl
-from sys import argv
 import logging
+import click
+from typing import Optional
+from pathlib import Path
+from taxopy.core import TaxDb
+from taxopy import Taxon
 
 # Configure logging
 logging.basicConfig(
@@ -25,22 +29,12 @@ logging.basicConfig(
 logger = logging.getLogger("[vcat]")
 
 
-DATABASE_DIR = argv[1]
-NUC = argv[2]
-PROT = argv[3]
-PROF = argv[4]
-OUTFILE = argv[5]
-# these should be moved to another place
-QCOV_ANI = argv[6]
-ANI = argv[7]
-
-# fasta = pyfastx.Fasta(FASTA)
-# headers = list(fasta.keys())
-
-# taxdb = taxopy.TaxDb(nodes_dmp=f"{DATABASE_DIR}/ictv-taxdump/nodes.dmp",
-#                      names_dmp=f"{DATABASE_DIR}/ictv-taxdump/names.dmp",
-#                      merged_dmp=f"{DATABASE_DIR}/ictv-taxdump/merged.dmp")
-
+def trim_lineage(taxid: int,
+                 taxdb: TaxDb,
+                 taxomic_level: str = "species"
+                 ) -> int:
+    # trims lineages to the level
+    return Taxon(taxid, taxdb).rank_taxid_dictionary.get(taxomic_level)
 
 keys = [
     "SequenceID",
@@ -168,66 +162,221 @@ n = [
     .alias("Species (binomial)"),
     pl.lit(None).alias("Species_score"),
 ]
-dfs = []
-matched = []
-try:
-    nuc = pl.read_csv(NUC, separator="\t")
 
-    nuc = (
-        nuc.filter((pl.col("qcov") > 0.7) & (pl.col("ani") > 0.7))
-        .group_by("query")
-        .agg(
-            pl.all().top_k_by("tani", 1),
+
+
+@click.command(context_settings=dict(help_option_names=["-h", "--help"]))
+@click.argument("db_dir", type=click.Path(exists=True, file_okay=False, path_type=str))
+@click.argument("nuc", type=click.Path(exists=True, dir_okay=False, path_type=str))
+@click.argument("prot", type=click.Path(exists=True, dir_okay=False, path_type=str))
+@click.argument("prof", type=click.Path(exists=True, dir_okay=False, path_type=str))
+@click.argument("outfile", type=click.Path(dir_okay=False, path_type=str))
+# These were argv[6] and argv[7] but “should be moved to another place” → make them options:
+@click.option(
+    "--tapif",
+    type=float,
+    default=0.15,
+    help="assign sequences above this tapi threshold to families",
+    required=False,
+)
+@click.option(
+    "--tapio",
+    type=float,
+    default=0.15,
+    help="assign sequences above this tapi threshold to orders",
+    required=False,
+)
+@click.option(
+    "--tapic",
+    type=float,
+    default=0.15,
+    help="assign sequences above this tapi threshold to classes",
+    required=False,
+)
+@click.option(
+    "--tapip",
+    type=float,
+    default=0.15,
+    help="assign sequences above this tapi threshold to phyla",
+    required=False,
+)
+@click.option(
+    "--tapik",
+    type=float,
+    default=0.15,
+    help="assign sequences above this tapi threshold to kingdoms",
+    required=False,
+)
+@click.option(
+    "--taaig",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to genera",
+    required=False,
+)
+@click.option(
+    "--taaif",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to families",
+    required=False,
+)
+@click.option(
+    "--taaio",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to orders",
+    required=False,
+)
+@click.option(
+    "--taaic",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to classes",
+    required=False,
+)
+@click.option(
+    "--taaip",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to phyla",
+    required=False,
+)
+@click.option(
+    "--taaik",
+    type=float,
+    default=0.3,
+    help="assign sequences above this taai threshold to kingdoms",
+    required=False,
+)
+@click.option(
+    "--tanis",
+    type=float,
+    default=0.81,
+    help="assign sequences above this taai threshold to species",
+    required=False,
+)
+@click.option(
+    "--tanig",
+    type=float,
+    default=0.49,
+    help="assign sequences above this taai threshold to genera",
+    required=False,
+)
+
+def main(
+    db_dir: str,
+    nuc: str,
+    prot: str,
+    prof: str,
+    outfile: str,
+    **kwargs
+):
+
+
+    # fasta = pyfastx.Fasta(FASTA)
+    # headers = list(fasta.keys())
+    # load the tax db
+    taxdb = TaxDb(  nodes_dmp=f"{db_dir}/ictv-taxdump/nodes.dmp",
+                    names_dmp=f"{db_dir}/ictv-taxdump/names.dmp",
+                    merged_dmp=f"{db_dir}/ictv-taxdump/merged.dmp")
+
+    def get_taxon(taxid: int) -> Taxon:
+        """Instantiate a Taxon using the global `taxdb`."""
+        return Taxon(taxid=taxid, taxdb=taxdb)
+
+
+    def get_rank_taxid(taxid: int, rank: str) -> int:
+        """Return the taxid that corresponds to *rank* (e.g. 'species', 'genus')."""
+        return get_taxon(taxid).rank_taxid_dictionary.get(rank)
+
+    dfs = []
+    matched = []
+    try:
+        # ani based filtering 
+        nuc_df = pl.read_csv(nuc, separator="\t")
+
+        df_species = (
+            nuc_df.filter(pl.col("tani") >= kwargs["tanis"])
+                .with_columns(
+                    # taxid of the species that this row belongs to
+                    pl.col("taxid").map_elements(lambda x: get_rank_taxid(x, "species")).alias("rank_taxid"),
+                    # full lineage (Taxon object)
+                    pl.col("taxid").map_elements(get_taxon).alias("taxlineage"),
+                    # level label
+                    pl.lit("species").alias("level")
+                )
         )
-        .explode(pl.all().exclude("query"))
-        .rename({"query": "seqid", "qlen": "qseqlen"})
-    )
+        df_genus = (
+            nuc_df.filter(
+                (pl.col("tani") >= kwargs["tanig"]) & 
+                (pl.col("tani") < kwargs["tanis"])
+            )
+            .with_columns(
+                # taxid of the genus that this row belongs to
+                pl.col("taxid").map_elements(lambda x: get_rank_taxid(x, "genus")).alias("rank_taxid"),
+                # full lineage (Taxon object)
+                pl.col("taxid").map_elements(get_taxon).alias("taxlineage"),
+                # level label
+                pl.lit("genus").alias("level")
+            )
+        )
 
-    nuc = nuc.with_columns(pl.lit("ani").alias("Method")).rename(
-        {"tani": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
-    )
-    matched = nuc["SequenceID"].to_list()
-    dfs.append(nuc)
-except Exception as e:
-    logger.info("no nucleotide level results to merge")
+        # ------------------------------------------------------------------
+        # Concatenate the two result DataFrames
+        # ------------------------------------------------------------------
+        nuc_df = pl.concat([df_species, df_genus])
+        matched = nuc_df["SequenceID"].to_list()
+        dfs.append(nuc_df)
+    except Exception:
+        logger.info("no nucleotide level results to merge")
 
-try:
-    prot = pl.read_csv(PROT, separator="\t")
+    try:
+        # aai based filtering
+        prot_df = pl.read_csv(prot, separator="\t")
 
-    prot = prot.with_columns(pl.lit("aai").alias("Method")).rename(
-        {"taai": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
-    )
-    prot = prot.filter(~pl.col("SequenceID").is_in(matched))
-    matched.extend(prot["SequenceID"].to_list())
-    dfs.append(prot)
+        prot_df = prot_df.with_columns(pl.lit("aai").alias("Method")).rename(
+            {"taai": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
+        )
+        prot_df = prot_df.filter(~pl.col("SequenceID").is_in(matched))
+        matched.extend(prot_df["SequenceID"].to_list())
+        dfs.append(prot_df)
 
-except Exception as e:
-    logger.info("no protein level results to merge")
+    except Exception:
+        logger.info("no prot level results to merge")
 
-try:
-    prof = pl.read_csv(PROF, separator="\t")
-    prof = prof.with_columns(pl.lit("api").alias("Method")).rename(
-        {"tapi": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
-    )
+    try:
+        # api based filtering
+        prof_df = pl.read_csv(prof, separator="\t")
+        prof_df = prof_df.with_columns(pl.lit("api").alias("Method")).rename(
+            {"tapi": "Score", "qseqlen": "Seqlen", "seqid": "SequenceID"}
+        )
 
-    prof = prof.filter(~pl.col("SequenceID").is_in(matched))
-    matched.extend(prof["SequenceID"].to_list())
-    dfs.append(prof)
+        prof_df = prof_df.filter(~pl.col("SequenceID").is_in(matched))
+        matched.extend(prof_df["SequenceID"].to_list())
+        dfs.append(prof_df)
 
-except Exception as e:
-    logger.info("no protein level results to merge")
-    
-# write a ictv taxonomy challange formatted file - this will be removed later
-pl.concat(
-    [
-        i.with_columns(*n).select(keys)  for i in dfs
-    ]
-).write_csv(OUTFILE.rstrip(".tsv") + "_ictv.csv", separator=",")
+    except Exception:
+        logger.info("no profile level results to merge")
+        
+    # write a ictv taxonomy challange formatted file - this will be removed later
 
-# write a file with more information
-pl.concat(
-    [
+    if len(dfs) > 0:
+        pl.concat(
+            [
+                i.with_columns(*n).select(keys)  for i in dfs
+            ]
+        ).write_csv(outfile.rstrip(".tsv") + "_ictv.csv", separator=",")
 
-        i.with_columns(*n).select(keys_full) for i in dfs
-    ]
-).write_csv(OUTFILE, separator="\t")
+        # write a file with more information
+        pl.concat(
+            [
+
+                i.with_columns(*n).select(keys_full) for i in dfs
+            ]
+        ).write_csv(outfile, separator="\t")
+    else:
+       Path(outfile).touch() 
+
+if __name__ == "__main__":
+    main()
