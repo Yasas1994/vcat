@@ -13,6 +13,7 @@ rule all:
         f"{DBDIR}/VMR_latest/bbmap_index/index_done",
         f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins",
         f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes",
+        f"{DBDIR}/VMR_latest/blast_genomes/blast_genomes",
         f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles",
         f"{DBDIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles_lca.tsv"
 
@@ -56,7 +57,7 @@ rule prepare:
 rule make_mmseqs_proteindb:
     input:
         seqs=f"{DBDIR}/VMR_latest/proteins.faa",
-        map=f"{DBDIR}/VMR_latest/virus_protein.accession2taxid"
+        taxmap=f"{DBDIR}/VMR_latest/virus_protein.accession2taxid"
     output:
         f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins"
     log:
@@ -64,19 +65,19 @@ rule make_mmseqs_proteindb:
     params:
         tmp=f"{DBDIR}/tmp/pdb",
         taxdump=f"{DBDIR}/ictv-taxdump",
-        map=f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins_mapping"
+        taxmap=f"{DBDIR}/VMR_latest/mmseqs_proteins/mmseqs_proteins_mapping"
     shell:
         """
         mkdir -p {params.tmp} &> {log}
         mmseqs createdb --dbtype 1 {input.seqs} {output}  &> {log}
-        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  &>> {log}
-        mmseqs nrtotaxmapping {input.map} {output} {params.map}  &>> {log}
+        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.taxmap}  &>> {log}
+        mmseqs nrtotaxmapping {input.taxmap} {output} {params.taxmap}  &>> {log}
         """
 
 rule make_mmseqs_genomedb:
     input:
         seqs=f"{DBDIR}/VMR_latest/genomes.fna",
-        map=f"{DBDIR}/VMR_latest/virus_genome.accession2taxid"
+        taxmap=f"{DBDIR}/VMR_latest/virus_genome.accession2taxid"
     output:
         f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes"
     log:
@@ -84,13 +85,31 @@ rule make_mmseqs_genomedb:
     params:
         tmp=f"{DBDIR}/tmp/gdb",
         taxdump=f"{DBDIR}/ictv-taxdump",
-        map=f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes_mapping"
+        taxmap=f"{DBDIR}/VMR_latest/mmseqs_genomes/mmseqs_genomes_mapping"
     shell:
         """
         mkdir -p {params.tmp} &> {log}
         mmseqs createdb --dbtype 0 {input.seqs} {output}  &> {log}
-        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.map}  &>> {log}
-        mmseqs nrtotaxmapping {input.map} {output} {params.map}  &>> {log}
+        mmseqs createtaxdb {output} {params.tmp} --ncbi-tax-dump {params.taxdump} --tax-mapping-file {input.taxmap}  &>> {log}
+        mmseqs nrtotaxmapping {input.taxmap} {output} {params.taxmap}  &>> {log}
+        """
+
+rule make_blast_genomedb:
+    input:
+        seqs=f"{DBDIR}/VMR_latest/genomes.fna",
+        accmap=f"{DBDIR}/VMR_latest/virus_genome.accession2taxid"
+    output:
+        f"{DBDIR}/VMR_latest/blast_genomes/blast_genomes"
+    log:
+        f"{DBDIR}/logs/make_blast_genomedb.log"
+    params:
+        taxmap=f"{DBDIR}/VMR_latest/virus_genomes_mapping"
+    shell:
+        """
+        cut -f 2,3 {input.accmap} | sed 1d > {params.taxmap}
+        makeblastdb -in {input.seqs} -out {output} -parse_seqids -dbtype nucl -taxid_map {params.taxmap} &> {log} && \
+        rm {params.taxmap} && \
+        touch {output}
         """
 
 rule make_bbmap_index:
