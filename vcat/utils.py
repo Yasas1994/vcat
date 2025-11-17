@@ -1,5 +1,5 @@
 
-from typing import List, Union, Dict, Any, OrderedDict, DefaultDict
+from typing import List, Union, Dict, Any, OrderedDict, DefaultDict, Optional, Mapping
 from tqdm import tqdm
 import mmap
 from collections import defaultdict
@@ -62,6 +62,63 @@ from numpy.typing import NDArray
 
 # polars implementation: fast!
 
+_PARENT_MAP: Mapping[str, Optional[str]] = {
+    'species':   'subgenus',   # change to 'genus' if that's your convention
+    'subgenus':  'genus',
+    'genus':     'subfamily',
+    'subfamily': 'family',
+    'family':    'suborder',
+    'suborder':  'order',
+    'order':     'class',
+    'class':     'subphylum',
+    'subphylum': 'phylum',
+    'phylum':    'kingdom',
+    'kingdom':   'realm',      # top-most rank
+    'realm':     None,
+}
+
+def get_rank_taxid(*, taxon, rank: str) -> int:
+    """
+    Return the taxid associated with a given rank, walking up the taxonomy
+    if the exact rank is missing for this taxon.
+
+    Parameters
+    ----------
+    taxon : object
+        An object with attribute `rank_taxid_dictionary` mapping rank (str) -> taxid (int).
+        Missing/unknown entries may be absent or set to -1.
+    rank : str
+        The taxonomic rank you are querying (e.g. 'species', 'genus').
+
+    Returns
+    -------
+    int
+        The taxid for the nearest available rank at or above `rank`, or -1 if none found.
+
+    Raises
+    ------
+    ValueError
+        If `rank` is not found in the internal rank mapping.
+    """
+    # normalize
+    key = rank.strip().lower()
+
+    # validate rank exists in our hierarchy map
+    if key not in _PARENT_MAP:
+        raise ValueError(f"Unknown taxonomic rank: {rank!r}")
+
+    # fetch from the taxon's dictionary, climbing to parents if missing
+    # Accept both missing and explicit -1 as "not available".
+    while key is not None:
+        taxid = getattr(taxon, "rank_taxid_dictionary", {}).get(key, -1)
+        if taxid is not None and taxid != -1:
+            return taxid
+        key = _PARENT_MAP[key]
+
+    # Reached the top with nothing found
+    return -1
+        
+
 def merge_intervals_with_cutoff(intervals, cutoff=0):
     """
     Merge intervals if the distance between consecutive (sorted) ranges is
@@ -79,7 +136,7 @@ def merge_intervals_with_cutoff(intervals, cutoff=0):
 
     Returns
     -------
-    np.ndarray of shape (m, 2)
+        np.ndarray of shape (m, 2)
         Merged intervals, sorted by start.
 
     Notes
@@ -251,6 +308,7 @@ def ani_summary(infile: Union[str, StringIO],
         mmseqs_nuc = mmseqs_nuc.filter(
             pl.col("alnlen").is_not_null() & pl.col("fident").is_not_null()
         )
+
         if (dbdir and level):
             taxdb = TaxDb(
                     nodes_dmp=f"{dbdir}/ictv-taxdump/nodes.dmp",
@@ -262,15 +320,15 @@ def ani_summary(infile: Union[str, StringIO],
                                                 has_header=True, 
                                                 separator="\t",
                                                 new_columns=["query", "query_version", "taxid", "gi" ])
-
-            mmseqs_nuc = mmseqs_nuc.filter(
-                pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).rank_taxid_dictionary.get(level), return_dtype=pl.Int64).alias("ttaxrank")
+            # function(Taxon, level)
+            mmseqs_nuc = mmseqs_nuc.with_columns(
+                pl.col("taxid").map_elements(lambda x : get_rank_taxid(taxon=Taxon(x, taxdb=taxdb), rank=level), return_dtype=pl.Int64).alias("ttaxrank")
             )
+            # qtaxinfo = qtaxinfo.with_columns(
+            #     pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).alias("qtaxlineage"))
+            # )
             qtaxinfo = qtaxinfo.with_columns(
-                pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).alias("qtaxlineage"))
-            )
-            qtaxinfo = qtaxinfo.with_columns(
-                pl.col("qtaxlineage").map_elements(lambda x : x.rank_taxid_dictionary.get(level), return_dtype=pl.Int64).alias("qtaxrank")
+                pl.col("taxid").map_elements(lambda x : get_rank_taxid(taxon=Taxon(x, taxdb=taxdb), rank=level), return_dtype=pl.Int64).alias("qtaxrank")
             )
             # add qtaxonomic info
             
@@ -566,22 +624,28 @@ def axi_summary(
             # filter level
             # accession	accession.version	taxid	gi
             qtaxinfo = pl.read_csv(f"{dbdir}/VMR_latest/virus_genome.accession2taxid",
-                                                has_header=True, 
-                                                separator="\t",
-                                                new_columns=["seqid", "seqid_version", "taxid", "gi" ])
+                                    has_header=True, 
+                                    separator="\t",
+                                    new_columns=["seqid", "seqid_version", "taxid", "gi" ])
+            # qtaxinfo = qtaxinfo.with_columns(
+            #     pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).alias("qlineage"))
+            # )
+            # if a taxrank is un-available, get the next higher rank 
             qtaxinfo = qtaxinfo.with_columns(
-                pl.col("taxid").map_elements(lambda x : Taxon(x, taxdb=taxdb).alias("qlineage"))
+                pl.col("taxid").map_elements(lambda x : get_rank_taxid(taxon=Taxon(x, taxdb=taxdb), rank=level), 
+                                             return_dtype=pl.Int64).alias("qtaxrank")
             )
-            qtaxinfo = qtaxinfo.with_columns(
-                pl.col("qtaxlineage").map_elements(lambda x : x.rank_taxid_dictionary.get(level), return_dtype=pl.Int64).alias("qtaxrank")
+            mmseqs_axi = mmseqs_axi.with_columns(
+                pl.col("taxid").map_elements(lambda x : get_rank_taxid(taxon=Taxon(x, taxdb=taxdb), rank=level),
+                                              return_dtype=pl.Int64).alias("ttaxrank")
             )
             # add qtaxonomic info
             # filter level
-            mmseqs_axi = qtaxinfo.select(cs.by_name(["accession","qtaxrank"])).join(
+            mmseqs_axi = qtaxinfo.select(cs.by_name(["seqid","qtaxrank"])).join(
                 mmseqs_axi, on="seqid", how="right"
             )
             mmseqs_axi = mmseqs_axi.filter(
-                pl.col("qtaxrank") != pl.col(level)
+                pl.col("qtaxrank") != pl.col("ttaxrank")
             )
 
 
@@ -648,6 +712,9 @@ def load_chunk(
     recstart: int, 
     recend: int
 ) -> StringIO:
+    """
+    load a single chunck of indexed blast results file to memory
+    """
     string_dump = ""
     with open(input, "r+b") as fh:
         mmapped_file = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
