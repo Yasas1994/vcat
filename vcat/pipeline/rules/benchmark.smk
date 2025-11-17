@@ -45,8 +45,7 @@ rule cal_ani:
         level = LEVEOUT_LEVEL
     shell:
         """
-        filter
-        vcat utils ani -i {input} \
+        vcat utils ani -i {input} -o {output} \
         --header query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage \
         --level {params.level} --dbdir {params.db} --batch {params.batch} {params.ani} &> {log}
         """
@@ -66,9 +65,9 @@ rule cal_aai:
         level = LEVEOUT_LEVEL,
     shell:
         """
-        vcat utils aai -i {input.m8} -g {input.gff} -d {params.db} \
+        vcat utils aai -i {input.m8} -g {input.gff} -d {params.db} -o {output} --topk 300\
         --header query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage \
-        --level {params.level} --batch {params.batch} {params.aai} &> {log}
+        --level {params.level} --dbdir {params.db} --batch {params.batch} {params.aai} &> {log}
         """
 
 rule cal_api:
@@ -86,14 +85,14 @@ rule cal_api:
         level = LEVEOUT_LEVEL,
     shell:
         """
-        vcat utils api -i {input.m8} -g {input.gff} -d {params.db}\
+        vcat utils api -i {input.m8} -g {input.gff} -d {params.db} -o {output} --topk 300 \
         --header query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage \
-        --level {params.level} --batch {params.batch} {params.api} &> {log}
+        --level {params.level} --dbdir {params.db}  --batch {params.batch} {params.api} &> {log}
         """
 
 rule summarize:
     input:
-        DATADIR = DBDIR,
+        DBDIR = DBDIR,
         PROF = f"{OUTDIR}/prof/{{sample}}_leaveout_{LEVEOUT_LEVEL}_api.tsv",
         PROT = f"{OUTDIR}/prot/{{sample}}_leaveout_{LEVEOUT_LEVEL}_aai.tsv",
         NUC = f"{OUTDIR}/nuc/{{sample}}_leaveout_{LEVEOUT_LEVEL}_ani.tsv",
@@ -106,10 +105,12 @@ rule summarize:
     threads: int(workflow.cores * 0.75)
 
     params:
-        ani=ANI_PARAMS
+        ani=ANI_PARAMS,
+        api=API_PARAMS,
+        aai=AAI_PARAMS
 
     shell:
         """ 
-        postprocess.py {input.DATADIR} {input.NUC} {input.PROT} {input.PROF} {output} {params.ani} &> {log}
+        postprocess.py {input.DBDIR} {input.NUC} {input.PROT} {input.PROF} {output} {params.ani} {params.aai} {params.api} &> {log}
         
         """

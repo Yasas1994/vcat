@@ -81,13 +81,11 @@ def handle_max_mem(max_mem, profile):
 
         return f" --resources mem={floor(max_mem)} mem_mb={floor(max_mem*1024)} java_mem={floor(0.85* max_mem)} "
 
-
 def get_snakefile(file=f"{PIPELINE_DIR }/Snakefile"):
     sf = os.path.join(os.path.dirname(os.path.abspath(__file__)), file)
     if not os.path.exists(sf):
         sys.exit("Unable to locate the Snakemake workflow file; tried %s" % sf)
     return sf
-
 
 def update_config(config_path, data: dict):
     import yaml
@@ -117,7 +115,7 @@ def cli(obj):
 
 
 @cli.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True),
     short_help="run contig annotation workflow",
     help="""
     The Virus Contig Annotation Tool (vcat) is a straightforward, homology-based application designed to 
@@ -199,35 +197,35 @@ def cli(obj):
 @click.option(
     "--tapio",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to orders",
     required=False,
 )
 @click.option(
     "--tapic",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to classes",
     required=False,
 )
 @click.option(
     "--tapip",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to phyla",
     required=False,
 )
 @click.option(
     "--tapik",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to kingdoms",
     required=False,
 )
 @click.option(
     "--taaig",
     type=float,
-    default=0.3,
+    default=0.49,
     help="assign sequences above this taai threshold to genera",
     required=False,
 )
@@ -267,17 +265,17 @@ def cli(obj):
     required=False,
 )
 @click.option(
-    "--ani",
+    "--tanis",
     type=float,
-    default=0.7,
-    help="filter out sequences below this ani threshold (ani)",
+    default=0.81,
+    help="assign sequences above this taai threshold to species",
     required=False,
 )
 @click.option(
-    "--qcov",
+    "--tanig",
     type=float,
-    default=0.7,
-    help="filter out sequences below this qcov threshold (ani)",
+    default=0.49,
+    help="assign sequences above this taai threshold to genera",
     required=False,
 )
 @click.option(
@@ -296,7 +294,7 @@ def cli(obj):
     help="Test execution.",
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
-def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwargs):
+def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
     """
     Runs vcat pipeline on contigs
 
@@ -309,15 +307,16 @@ def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwar
         db_dir = database
     else:
         db_dir = conf["database_dir"]
-    taai_parms = ""
+    taai_params = ""
     tapi_params = ""
-    ani_params = f" --ani {kwargs['ani']} --qcov {kwargs['qcov']}"
+    tani_params = ""
     for k, v in kwargs.items():
         if k.startswith("taai"):
-            taai_parms += f" --{k} {v}"
+            taai_params += f" --{k} {v}"
         elif k.startswith("tapi"):
             tapi_params += f" --{k} {v}"
-
+        elif k.startswith("tani"):
+            tani_params += f" --{k} {v}"
     cmd = (
         "snakemake --snakefile {snakefile} "
         " --jobs {jobs} --rerun-incomplete "
@@ -331,9 +330,9 @@ def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwar
         snakefile=get_snakefile("./pipeline/Snakefile"),
         jobs=jobs,
         configfile=CONFIG,
-        aai_params=taai_parms,
+        aai_params=taai_params,
         api_params=tapi_params,
-        ani_params=ani_params,
+        ani_params=tani_params,
         nuc_search=kwargs.get('nuc_search'),
         batch=batch,
         db_dir=db_dir,
@@ -352,7 +351,7 @@ def contigs(input, output, database, jobs, batch, dryrun, snakemake_args, **kwar
 
 
 @cli.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True),
     short_help="run read annotation workflow",
     help="""
     The Virus Contig Annotation Tool (vcat) is a straightforward, homology-based application designed to 
@@ -442,7 +441,7 @@ def reads(input, output, jobs, profile, dryrun, snakemake_args):
 
 # Download and build
 @cli.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True),
     short_help="download and build reference databases",
 )
 @click.option(
@@ -522,7 +521,7 @@ default_db, choices, default_url = format_databases(config=CONFIG_CONTENT)
 
 
 @cli.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True),
     short_help="pull pre-built databases from a remote server",
 )
 @click.option(
@@ -608,6 +607,14 @@ def utils(obj):
     required=True,
 )
 @click.option(
+    "-o",
+    "--output",
+    type=str,
+    default=None,
+    help="output file path",
+    required=False,
+)
+@click.option(
     "--header",
     callback=parse_csv,
     help="columnames of the m8 file",
@@ -615,24 +622,17 @@ def utils(obj):
     required=False,
 )
 @click.option(
-    "--qcov",
+    "--tanig",
     type=float,
-    default=0,
-    help="filter results below this qcov cutoff",
+    default=0.49,
+    help="assign sequences above this taai threshold to genera",
     required=False,
 )
 @click.option(
-    "--tani",
+    "--tanis",
     type=float,
-    default=0,
-    help="filter results below this tani cutoff",
-    required=False,
-)
-@click.option(
-    "--ani",
-    type=float,
-    default=0,
-    help="filter results below this ani cutoff",
+    default=0.81,
+    help="assign sequences above this taai threshold to species",
     required=False,
 )
 @click.option(
@@ -663,7 +663,7 @@ def utils(obj):
     help="number of records to process at a time",
     required=False,
 )
-def ani(input, header, ani, tani, qcov, level, dbdir, all, batch):
+def ani(input, output, header, level, dbdir, all, batch, **kwargs):
     """
     calculates the average nucleotide identity and coverage of a query sequence
     to the best
@@ -684,9 +684,9 @@ def ani(input, header, ani, tani, qcov, level, dbdir, all, batch):
                 input, index=index, recstart=i, recend=min(i + CHUNK_SIZE, len(index))
             )
             outfile = os.path.join(
-                os.path.dirname(input),
-                f"{os.path.splitext(file_name)[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv",
-            )
+                    os.path.dirname(input),
+                    f"{os.path.splitext(file_name)[0]}_ani_{min(i + CHUNK_SIZE, len(index))}.tsv",
+                )
             status = ani_summary(finput, all=all, header=header, level=level, dbdir=dbdir)
             if isinstance(status, pl.DataFrame):
                 status.write_csv(outfile, separator="\t")
@@ -702,16 +702,19 @@ def ani(input, header, ani, tani, qcov, level, dbdir, all, batch):
     logger.info("trying to merge temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     tmp = [i for i in tmp if not i.is_empty()]
-    outfile = os.path.join(
-            os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv"
-        )
+    if not output:
+        outfile = os.path.join(
+                os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_ani.tsv"
+            )
+    else:
+        outfile = output
     if tmp:
         df = pl.concat(tmp)
 
         df.write_csv(outfile, separator="\t")
         logger.info(f"{outfile} updated")
     else:
-        logger.info(f"all tables are empty")
+        logger.info("all tables are empty")
         Path(outfile).touch()
 
     # Remove temporary TSV files
@@ -720,7 +723,7 @@ def ani(input, header, ani, tani, qcov, level, dbdir, all, batch):
 
 
 @utils.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True),
     help="""
             calculates aai from mmseqs ICTV viral protein comparision results
             and writes the results to <input>_aai.tsv
@@ -742,6 +745,14 @@ def ani(input, header, ani, tani, qcov, level, dbdir, all, batch):
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
     help="BLAST tabular (m8) output file",
     required=True,
+)
+@click.option(
+    "-o",
+    "--output",
+    type=str,
+    default=None,
+    help="output file path",
+    required=False,
 )
 @click.option(
     "-g",
@@ -835,7 +846,7 @@ def ani(input, header, ani, tani, qcov, level, dbdir, all, batch):
     required=False,
 )
 def aai(
-    input, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk, level, all
+    input, output, header, taaig, taaif, taaio, taaic, taaip, taaik, batch, dbdir, gff, topk, level, all
 ):
     """
     calculates the average aminoacid identity and coverage of a query sequence
@@ -880,16 +891,19 @@ def aai(
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     tmp = [i for i in tmp if not i.is_empty()]
-    outfile = os.path.join(
-            os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai.tsv"
-        )
+    if not output:
+        outfile = os.path.join(
+                os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_aai.tsv"
+            )
+    else:
+        outfile = output
     if tmp:
         df = pl.concat(tmp)
 
         df.write_csv(outfile, separator="\t")
         logger.info(f"{outfile} updated")
     else:
-        logger.info(f"all tables are empty")
+        logger.info("all tables are empty")
         Path(outfile).touch()
 
     # Remove temporary TSV files
@@ -929,6 +943,14 @@ def aai(
     required=True,
 )
 @click.option(
+    "-o",
+    "--output",
+    type=str,
+    default=None,
+    help="output file path",
+    required=False,
+)
+@click.option(
     "--header",
     callback=parse_csv,
     help="columnames of the m8 file ",
@@ -945,28 +967,28 @@ def aai(
 @click.option(
     "--tapio",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to orders",
     required=False,
 )
 @click.option(
     "--tapic",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to classes",
     required=False,
 )
 @click.option(
     "--tapip",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to phyla",
     required=False,
 )
 @click.option(
     "--tapik",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to kingdoms",
     required=False,
 )
@@ -1005,7 +1027,7 @@ def aai(
     help="get api for all top-k hits per query sequence. by default only outputs the besthit",
     required=False,
 )
-def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk, level, all):
+def api(input, output, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, topk, level, all):
     """
     calculates the average profile identity and coverage of a query sequence
     to the genomes in the target database
@@ -1048,9 +1070,13 @@ def api(input, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, gff, top
     logger.info("merging temporary files")
     tmp = [pl.read_csv(f, separator="\t") for f in tmp_files]
     tmp = [i for i in tmp if not i.is_empty()]
-    outfile = os.path.join(
-            os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api.tsv"
-        )
+    if not output:
+        outfile = os.path.join(
+                os.path.dirname(input), f"{os.path.splitext(file_name)[0]}_api.tsv"
+            )
+    else:
+        outfile = output
+
     if tmp:
         df = pl.concat(tmp)
         df.write_csv(outfile, separator="\t")
@@ -1146,42 +1172,42 @@ def fragment(input, header, min, max, batch, dbdir, gff):
 @click.option(
     "--tapif",
     type=float,
-    default=0.3,
+    default=0.30,
     help="assign sequences above this tapi threshold to families",
     required=False,
 )
 @click.option(
     "--tapio",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to orders",
     required=False,
 )
 @click.option(
     "--tapic",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to classes",
     required=False,
 )
 @click.option(
     "--tapip",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to phyla",
     required=False,
 )
 @click.option(
     "--tapik",
     type=float,
-    default=0.3,
+    default=0.15,
     help="assign sequences above this tapi threshold to kingdoms",
     required=False,
 )
 @click.option(
     "--taaig",
     type=float,
-    default=0.3,
+    default=0.49,
     help="assign sequences above this taai threshold to genera",
     required=False,
 )
@@ -1221,17 +1247,17 @@ def fragment(input, header, min, max, batch, dbdir, gff):
     required=False,
 )
 @click.option(
-    "--ani",
+    "--tanig",
     type=float,
-    default=0.7,
-    help="filter out sequences below this ani threshold (ani)",
+    default=0.49,
+    help="assign sequences above this tani threshold to genera",
     required=False,
 )
 @click.option(
-    "--qcov",
+    "--tanis",
     type=float,
-    default=0.7,
-    help="filter out sequences below this qcov threshold (ani)",
+    default=0.81,
+    help="assign sequences above this tani threshold to species",
     required=False,
 )
 @click.option(
@@ -1262,14 +1288,17 @@ def benchmark(dbdir, results, batch, level, snakemake_args, **kwargs):
     """
     pass
     logger.info(f"vcat version: {__version__}")
-    taai_parms = ""
+    taai_params = ""
     tapi_params = ""
-    ani_params = f" --ani {kwargs['ani']} --qcov {kwargs['qcov']}"
+    tani_params = ""
     for k, v in kwargs.items():
         if k.startswith("taai"):
-            taai_parms += f" --{k} {v}"
+            taai_params += f" --{k} {v}"
         elif k.startswith("tapi"):
             tapi_params += f" --{k} {v}"
+        elif k.startswith("tani"):
+            tani_params += f" --{k} {v}"
+        
 
     jobs = kwargs.get("jobs", 4)
     cmd = (
@@ -1286,9 +1315,9 @@ def benchmark(dbdir, results, batch, level, snakemake_args, **kwargs):
         batch=batch,
         db_dir=dbdir,
         results=results,
-        aai_params=taai_parms,
+        aai_params=taai_params,
         api_params=tapi_params,
-        ani_params=ani_params,
+        ani_params=tani_params,
         level=level,
         args=" ".join(snakemake_args),
     )
