@@ -233,7 +233,8 @@ with open(f"{SEQDIR}/virus_protein.accession2taxid", "w") as fh2:
                                 )
 logger.info(f"{SEQDIR}/virus_protein.accession2taxid created")
 
-seq_records = []
+seq_records = {}
+# ensure uniqueness of records
 for file in tqdm(all_files):
     with open(file) as handle:
         for record in GenBank.parse(handle):
@@ -244,16 +245,18 @@ for file in tqdm(all_files):
                 else:
                     feature_range = 0, None
                 if record.sequence[feature_range[0] : feature_range[1]] != "":
-                    seq_records.append(
-                        SeqRecord(
-                            Seq(record.sequence[feature_range[0] : feature_range[1]]),
-                            id=record.accession[0],
-                            description=f"[{record.source}] {record.data_file_division}",
-                        )
-                    )
+                    if record.accession[0] in seq_records:
+                        logger.warning(f"{record.accession[0]} is duplicated!")
+                    else:
+                        seq_records[record.accession[0]] = SeqRecord(
+                                Seq(record.sequence[feature_range[0] : feature_range[1]]),
+                                id=record.accession[0],
+                                description=f"[{record.source}] {record.data_file_division}",
+                            )
+                
 # Write the genome sequences to a file
 with open(f"{SEQDIR}/genomes.fna", "w") as output_handle:
-    SeqIO.write(seq_records, output_handle, "fasta")
+    SeqIO.write(seq_records.values(), output_handle, "fasta")
 
 logger.info(f"{SEQDIR}/genomes.fna created")
 
