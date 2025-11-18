@@ -1,10 +1,5 @@
 sphinx>=7.0
 myst-parser>=2.0
 furo
-
-# Sphinx extensions that require installation
 sphinx-design
 sphinx-copybutton
-
-# Optional but recommended for better cross-linking
-sphinx-ext-intersphinx
