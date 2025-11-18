@@ -2,7 +2,7 @@
 
 `vcat` annotates viral contigs by sequentially comparing query sequences against nucleotide, protein, and profile databases using `mmseqs2`. The annotation process includes three stages.
 
-```{figure} _static/figures/vcat.svg
+```{figure} _static/figures/vcat_workflow.svg
 :name: fig-vcat-workflow
 :scale: 100%
 :align: center

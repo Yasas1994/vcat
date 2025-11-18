@@ -56,7 +56,7 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 html_theme = "furo"
-html_favicon = "_static/figures/vcat_logo.png"
+html_favicon = "_static/figures/vcat.svg"
 pygments_style = "tango"
 pygments_dark_style = "tango"
 html_theme_options = {
