@@ -1,4 +1,8 @@
-![plot](./docs/_source/_static/figures/vcat_logo.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/_source/_static/figures/vcat_logo_dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./docs/_source/_static/figures/vcat_logo_light.svg">
+  <img alt="Fallback image description" src="./docs/_source/_static/figures/vcat_logo_dark.svg">
+</picture>
 
 ![GitHub](https://img.shields.io/github/license/Yasas1994/vcat) ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/Yasas1994/vcat/main?color=8a35da)
 
