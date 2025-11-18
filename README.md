@@ -4,7 +4,8 @@
   <img alt="Fallback image description" src="./docs/_source/_static/figures/vcat_logo_dark.svg">
 </picture>
 
-![GitHub](https://img.shields.io/github/license/Yasas1994/vcat) ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/Yasas1994/vcat/main?color=8a35da)
+![GitHub](https://img.shields.io/github/license/Yasas1994/vcat) 
+![GitHub last commit (branch)](https://img.shields.io/github/last-commit/Yasas1994/vcat/main?color=8a35da)
 
 
 The virus contig annotation Tool (vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for viral contigs, mapping reads to virus contigs and much more.
