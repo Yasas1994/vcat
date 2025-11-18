@@ -62,8 +62,8 @@ pygments_dark_style = "tango"
 html_theme_options = {
     "sidebar_hide_name": True,
     "navigation_with_keys": True,
-    "light_logo": "figures/vcat_logo.svg",
-    "dark_logo": "figures/vcat_logo.svg",
+    "light_logo": "figures/vcat_logo_light.svg",
+    "dark_logo": "figures/vcat_logo_dark.svg",
     "light_css_variables": {
         "font-stack": "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,Fira Sans,Droid Sans,Helvetica Neue,sans-serif",
         "font-stack--monospace": "ui-monospace,Cascadia Mono,Source Code Pro,Segoe UI Mono,Menlo,Monaco,Consolas,Courier New,monospace",
