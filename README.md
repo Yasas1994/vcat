@@ -10,7 +10,7 @@
 The virus contig annotation Tool (vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for viral contigs, mapping reads to virus contigs and much more.
 
 > [!NOTE] 
-> vcat [documentation](https://app.readthedocs.org/projects/vcat/
+> vcat [documentation](https://vcat.readthedocs.io/en/latest/
 ) is now online! 
 
 ### Changelog
