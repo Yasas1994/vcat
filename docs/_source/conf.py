@@ -58,7 +58,7 @@ exclude_patterns = []
 html_theme = "furo"
 html_favicon = "_static/figures/vcat.svg"
 pygments_style = "tango"
-pygments_dark_style = "tango"
+pygments_dark_style = "monokai"
 html_theme_options = {
     "sidebar_hide_name": True,
     "navigation_with_keys": True,
@@ -69,12 +69,6 @@ html_theme_options = {
         "font-stack--monospace": "ui-monospace,Cascadia Mono,Source Code Pro,Segoe UI Mono,Menlo,Monaco,Consolas,Courier New,monospace",
         "admonition-title-font-size": "0.9rem",
         "admonition-font-size": "0.9rem",
-        "color-foreground-primary": "#2c3e50",
-        "color-brand-primary": "#379d6f",
-        "color-brand-content": "#379d6f",
-        "color-foreground-muted": "#81868d",
-    },
-    "dark_css_variables": {
         "color-problematic": "#b30000",
         "color-foreground-primary": "#2c3e50",
         "color-foreground-secondary": "#5a5c63",
@@ -101,6 +95,38 @@ html_theme_options = {
         "color-card-marginals-background": "var(--color-background-hover)",
         "color-code-foreground": "black",
         "color-code-background": "#f8f9fb",
+    },
+    "dark_css_variables": {
+        "font-stack": "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,Fira Sans,Droid Sans,Helvetica Neue,sans-serif",
+        "font-stack--monospace": "ui-monospace,Cascadia Mono,Source Code Pro,Segoe UI Mono,Menlo,Monaco,Consolas,Courier New,monospace",
+        "admonition-title-font-size": "0.9rem",
+        "admonition-font-size": "0.9rem",
+        "color-problematic": "#ff6363",
+        "color-foreground-primary": "#e6e6e6",
+        "color-foreground-secondary": "#b8bcc2",
+        "color-foreground-muted": "#8f9399",
+        "color-foreground-border": "#55585c",
+        "color-background-primary": "#1a1d21",
+        "color-background-secondary": "#23272d",
+        "color-background-hover": "#2c3037",
+        "color-background-hover--transparent": "#2c303700",
+        "color-background-border": "#30343a",
+        "color-background-item": "#3a3f45",
+        "color-announcement-background": "#000000dd",
+        "color-announcement-text": "#f0f0f0",
+        "color-brand-primary": "#379d6f",
+        "color-brand-content": "#379d6f",
+        "color-highlighted-background": "#2a3a55",
+        "color-guilabel-background": "#2a3a5580",
+        "color-guilabel-border": "#445a7080",
+        "color-api-keyword": "var(--color-foreground-secondary)",
+        "color-highlight-on-target": "#504d1a",
+        "color-admonition-background": "transparent",
+        "color-card-border": "var(--color-background-secondary)",
+        "color-card-background": "transparent",
+        "color-card-marginals-background": "var(--color-background-hover)",
+        "color-code-foreground": "#e6e6e6",
+        "color-code-background": "#2b2f36"
     },
     "footer_icons": [
         {

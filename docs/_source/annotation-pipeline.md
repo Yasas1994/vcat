@@ -1,12 +1,19 @@
-### Virus Contig Annotation Pipeline
+# Virus Contig Annotation Pipeline
 
 `vcat` annotates viral contigs by sequentially comparing query sequences against nucleotide, protein, and profile databases using `mmseqs2`. The annotation process includes three stages.
 
-```{figure} _static/figures/vcat_workflow.svg
-:name: fig-vcat-workflow
-:scale: 100%
+```{image} _static/figures/vcat_workflow_light.svg
+:name: fig-vcat-workflow-light
 :align: center
+:class: only-light
 ```
+
+```{image} _static/figures/vcat_workflow_dark.svg
+:name: fig-vcat-workflow-dark
+:align: center
+:class: only-dark
+```
+
 #### Nucleotide database comparison
 
 Query sequences are first compared to the nucleotide database using mmseqs_blastn. Optionally, users can switch to mmseqs_tblastx for higher sensitivity at the cost of longer run-times. vcat then tries to find the genome with the highest nucleotide similarity to the query seqeunce by approximating the ANIs between the query and genomes in the database. If the total ANI between the query and the targert is greater than 0.81, we assign the query to target's species. Target's genus is trnsfered to the query, if the ANI between them is between 0.49 and 0.81.
