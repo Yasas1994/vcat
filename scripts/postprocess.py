@@ -293,16 +293,20 @@ def main(
     dfs = []
     matched = []
     try:
-        # ani based filtering 
+    # ani based filtering 
         nuc_df = pl.read_csv(nuc, separator="\t")
-
+        
+        nuc_df = nuc_df.with_columns(pl.lit("ani").alias("Method")).rename(
+            {"ani": "Score", "qlen": "Seqlen", "query": "SequenceID"}
+        )
+        
         df_species = (
             nuc_df.filter(pl.col("tani") >= kwargs["tanis"])
                 .with_columns(
                     # taxid of the species that this row belongs to
                     pl.col("taxid").map_elements(lambda x: get_rank_taxid(x, "species")).alias("rank_taxid"),
                     # full lineage (Taxon object)
-                    pl.col("taxid").map_elements(get_taxon).alias("taxlineage"),
+                    pl.col("taxid").map_elements(lambda x: str(get_taxon(x))).alias("taxlineage"),
                     # level label
                     pl.lit("species").alias("level")
                 )
@@ -316,7 +320,7 @@ def main(
                 # taxid of the genus that this row belongs to
                 pl.col("taxid").map_elements(lambda x: get_rank_taxid(x, "genus")).alias("rank_taxid"),
                 # full lineage (Taxon object)
-                pl.col("taxid").map_elements(get_taxon).alias("taxlineage"),
+                pl.col("taxid").map_elements(lambda x : str(get_taxon(x))).alias("taxlineage"),
                 # level label
                 pl.lit("genus").alias("level")
             )
@@ -327,9 +331,10 @@ def main(
         # ------------------------------------------------------------------
         nuc_df = pl.concat([df_species, df_genus])
         matched = nuc_df["SequenceID"].to_list()
-        dfs.append(nuc_df)
-    except Exception:
-        logger.info("no nucleotide level results to merge")
+        if not nuc_df.is_empty():
+            dfs.append(nuc_df)
+    except Exception as e:
+        logger.info(f"nucleotide level results were not added because {e}")
 
     try:
         # aai based filtering
@@ -340,7 +345,8 @@ def main(
         )
         prot_df = prot_df.filter(~pl.col("SequenceID").is_in(matched))
         matched.extend(prot_df["SequenceID"].to_list())
-        dfs.append(prot_df)
+        if not prot_df.is_empty():
+            dfs.append(prot_df)
 
     except Exception:
         logger.info("no prot level results to merge")
@@ -354,7 +360,8 @@ def main(
 
         prof_df = prof_df.filter(~pl.col("SequenceID").is_in(matched))
         matched.extend(prof_df["SequenceID"].to_list())
-        dfs.append(prof_df)
+        if not prof_df.is_empty():
+            dfs.append(prof_df)
 
     except Exception:
         logger.info("no profile level results to merge")
@@ -362,6 +369,7 @@ def main(
     # write a ictv taxonomy challange formatted file - this will be removed later
 
     if len(dfs) > 0:
+        #logger.info(nuc_df.columns, keys)
         pl.concat(
             [
                 i.with_columns(*n).select(keys)  for i in dfs

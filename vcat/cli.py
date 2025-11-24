@@ -585,7 +585,7 @@ def utils(obj):
 
 
 @utils.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True),
     help="""calculates ani from mmseqs ICTV genome comparision results
             and writes the results to <input>_ani.tsv
 
@@ -912,7 +912,7 @@ def aai(
 
 
 @utils.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True,),
     help="""
             calculates api from mmseqs ICTV viral protein comparision results
             and writes the results to <input>_api.tsv
@@ -1082,7 +1082,7 @@ def api(input, output, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, 
         df.write_csv(outfile, separator="\t")
         logger.info(f"{outfile} updated")
     else:
-        logger.info(f"all tables are empty")
+        logger.info("all tables are empty")
 
     # Remove temporary TSV files
     for file in tmp_files:
@@ -1091,7 +1091,7 @@ def api(input, output, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, 
 
 
 @utils.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True, show_default=True),
     help="""
             subsamples nucleotide fragments from a multifasta file from a 
             given size range
@@ -1114,31 +1114,67 @@ def api(input, output, header, tapif, tapio, tapic, tapip, tapik, batch, dbdir, 
     "-o",
     "--output",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
-    help="output file with fasta fragments",
+    help="output fasta file with sequence fragments",
     required=True,
 )
 @click.option(
-    "--min",
+    "--minlen",
     type=int,
-    default=0.1,
-    help="minium fragement length as a percentage of the input sequence's length",
+    default=5000,
+    help="minium fragement length",
     required=False,
 )
 @click.option(
-    "--max",
+    "--maxlen",
     type=int,
-    default=0.9,
-    help="maxmium fragment length as a percentage of the input sequence's length",
+    default=5000,
+    help="maxmium fragment length",
     required=False,
 )
-def fragment(input, header, min, max, batch, dbdir, gff):
+@click.option(
+    "--overlap",
+    type=int,
+    default=0,
+    help="number of overlapping bases between two consecutive windows",
+    required=False,
+)
+@click.option(
+    "--coverage",
+    type=float,
+    default=None,
+    help="sample sub-sequences until this coverage threshold is met",
+    required=False,
+)
+@click.option(
+    "--circular",
+    is_flag=True,
+    default=False,
+    help="whether the genomes are circular or not",
+    required=False,
+)
+@click.option(
+    "--man_n_prop",
+    type=float,
+    default=0.3,
+    help="maximum proportion of Ns allowed in a fragment",
+    required=False,
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=42,
+    help="seed for the random number generator",
+    required=False,
+)
+def fragment(**kwargs):
     """
     generates nucleotide framents from input multi fasta file (comming soon)
     """
-    pass
+    from vcat.frgment import split_core
+    split_core(**kwargs)
 
 @utils.command(
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings=dict(ignore_unknown_options=True,  show_default=True),
     help="""
     benchmark the performance by leaving out taxa. Suppose target X belongs to taxon Y 
     we remove all query hits to taxon Y and calculate the axi to the taxa belonging to remianing hits.

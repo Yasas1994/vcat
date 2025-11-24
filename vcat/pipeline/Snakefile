@@ -269,7 +269,7 @@ rule cal_api:
 
 rule summarize:
     input:
-        DATADIR = DBDIR,
+        DBDIR = DBDIR,
         PROF = f"{OUTDIR}/prof/{{sample}}_{{ext}}_prof_api.tsv",
         PROT = f"{OUTDIR}/prot/{{sample}}_{{ext}}_prot_aai.tsv",
         NUC = f"{OUTDIR}/nuc/{{sample}}_{{ext}}_genome_ani.tsv",
@@ -288,7 +288,7 @@ rule summarize:
 
     shell:
         """ 
-        postprocess.py {input.NUC} {input.PROT} {input.PROF} {output} {params.ani} {params.aai} {params.api} &> {log}
+        postprocess.py {input.DBDIR} {input.NUC} {input.PROT} {input.PROF} {output} {params.ani} {params.aai} {params.api} &> {log}
         
         """
 
