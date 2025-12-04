@@ -21,7 +21,7 @@ setup(
     author=__author__,
     author_email=__email__,
     zip_safe=False,
-    description="vact - workflows for transferring taxonomic annotations to virus contigs",
+    description="Vcat - workflows for transferring taxonomic annotations to virus contigs",
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=["vcat"],

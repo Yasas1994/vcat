@@ -1,4 +1,4 @@
-## Running vcat
+## Running Vcat
 
 ### Contig annotation workflow : Quick start
 
@@ -100,7 +100,7 @@ As a rough guideline, it takes around **4 hours** to run vcat on the ICTV Taxono
 
 vcat reports the predicted taxonomic lineage for each query sequence in a structured results table. Each row corresponds to a single sequence and lists the assigned taxa across all ICTV hierarchical ranks, from realm down to species, whenever a match is detected.
 
-The Score column contains the computed similarity metric—tANI, tAAI, or tAPI, depending on which database level produced the annotation. These values range from 0 to 1, with 1.0 indicating a perfect match to a reference at that rank. The Method column specifies which comparison level generated the score:
+The Score column contains the computed similarity metric—tANI, txAAI, or txAPI, depending on which database level produced the annotation. These values range from 0 to 1, with 1.0 indicating a perfect match to a reference at that rank. The Method column specifies which comparison level generated the score:
 
 ani → nucleotide-level comparison (tANI)
 
@@ -148,13 +148,13 @@ vcat reads -i1 <reads1>.fastq [-i2 <reads2.fastq>] -o outdir
 ### Utility workflows
 ---
 
-#### Calculate AAI of query contigs to ICTV genomes
+#### Calculate txAAI of query contigs to ICTV genomes
 
 ```bash
 vcat utils aai [OPTIONS] -i contigs.m8 -g contigs.gff -d [DBDIR]
 ```
 
-#### Calculate ANI of query contigs to ICTV genomes
+#### Calculate tANI of query contigs to ICTV genomes
 
 ```bash
 vcat utils ani [OPTIONS] -i contigs.m8

@@ -108,7 +108,7 @@ def update_config(config_path, data: dict):
 @click.pass_context
 def cli(obj):
     r"""
-    vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus contigs,
+    Vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus contigs,
     mapping reads to virus genomes and much more.
     (https://github.com/Yasas1994/vcat)"""
     pass
@@ -118,22 +118,8 @@ def cli(obj):
     context_settings=dict(ignore_unknown_options=True, show_default=True),
     short_help="run contig annotation workflow",
     help="""
-    The Virus Contig Annotation Tool (vcat) is a straightforward, homology-based application designed to 
+    The Virus contig annotation tool (Vcat) is a straightforward, homology-based application designed to 
     provide taxonomic annotations for viral contigs. 
-    
-    The workflow consists of three steps 
-
-    Nucleotide Database Comparison: Query sequences are first compared to the nucleotide database. 
-    If matches with >95% ANI and >85% query coverage are found, the lineage of the target 
-    sequence is assigned to the query sequence.
-
-    Protein Database Comparison: For query sequences with no significant matches at the nucleotide
-    level, open reading frames (ORFs) within the query sequence are extracted and compared to the 
-    viral protein database to calculate AAI and the query coverage (number of proteins shared between
-    query and the targer)
-
-    Profile Database Comparison: Sequences that remain unannotated at the protein level are then
-    compared to the protein profile database to provide taxonomic annotations.
 
     """,
 )
@@ -296,7 +282,7 @@ def cli(obj):
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
 def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
     """
-    Runs vcat pipeline on contigs
+    Runs Vcat pipeline on contigs
 
     Most snakemake arguments can be appended to the command for more info see 'snakemake --help'
     """
@@ -354,7 +340,7 @@ def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
     context_settings=dict(ignore_unknown_options=True, show_default=True),
     short_help="run read annotation workflow",
     help="""
-    The Virus Contig Annotation Tool (vcat) is a straightforward, homology-based application designed to 
+    The Virus contig annotation tool (Vcat) is a straightforward, homology-based application designed to 
     provide taxonomy annotations to virus contigs and mapping reads directly to virus genomes.
 
     usage
@@ -401,7 +387,7 @@ def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
 def reads(input, output, jobs, profile, dryrun, snakemake_args):
     """
-    Runs vcat pipeline on reads
+    Runs Vcat pipeline on reads
 
     Most snakemake arguments can be appended to the command for more info see 'snakemake --help'
     """

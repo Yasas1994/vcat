@@ -8,10 +8,10 @@
 ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/Yasas1994/vcat/main?color=8a35da)
 
 
-The virus contig annotation Tool (vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for viral contigs, mapping reads to virus contigs and much more.
+The Virus contig annotation tool (Vcat) is a straightforward, homology-based application designed to provide taxonomic annotations for virus contigs, mapping reads to virus contigs and much more.
 
 > [!NOTE] 
-> vcat [documentation](https://vcat.readthedocs.io/en/latest/
+> Vcat [documentation](https://vcat.readthedocs.io/en/latest/
 ) is now online! 
 
 ### Changelog
@@ -40,7 +40,7 @@ vcat --help
 
 Usage: vcat [OPTIONS] COMMAND [ARGS]...
 
-  vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus
+  Vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus
   contigs, mapping reads to virus genomes and much more.
   (https://github.com/Yasas1994/vcat)
 
@@ -70,7 +70,7 @@ apptainer run vcat.sif vcat --help
 
 Usage: vcat [OPTIONS] COMMAND [ARGS]...
 
-  vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus
+  Vcat: a command-line tool-kit for adding ICTV taxonomy annotations to virus
   contigs, mapping reads to virus genomes and much more.
   (https://github.com/Yasas1994/vcat)
 
