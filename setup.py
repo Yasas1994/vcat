@@ -15,7 +15,7 @@ with open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="vcat",
-    version="0.0.2",
+    version="0.0.3",
     url="https://github.com/Yasas94/vcat",
     license=__license__,
     author=__author__,
@@ -35,14 +35,6 @@ setup(
     entry_points={"console_scripts": ["vcat = vcat.cli:cli"]},
     classifiers=["Topic :: Scientific/Engineering :: Bio-Informatics"],
     scripts=[
-        "scripts/add_lineage_to_blast_out.py",
-        "scripts/correct_profile_taxinfo.py",
-        "scripts/get_cluster_lca.py",
-        "scripts/download_gb.py",
-        "scripts/ictv_out.py",
-        "scripts/postprocess.py",
-        "scripts/prepare.py",
-        "scripts/remove_empty_records.py",
-
+        "scripts/*"
     ],
 )
