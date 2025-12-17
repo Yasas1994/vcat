@@ -80,7 +80,8 @@ rule all:
     input:
         f"{OUTDIR}/{SAMPLE}.sorted.bam",
         f"{OUTDIR}/{SAMPLE}.sorted.bam.bai",
-        f"{OUTDIR}/{SAMPLE}.pileup.tsv"
+        f"{OUTDIR}/{SAMPLE}.pileup.tsv",
+        f"{OUTDIR}/{SAMPLE}.vcat.tsv"
 
 
 rule map_reads:
