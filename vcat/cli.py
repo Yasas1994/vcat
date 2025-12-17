@@ -303,43 +303,56 @@ def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
 
     logger.info(f"vcat version: {__version__}")
     conf = load_configfile(CONFIG)
-    if database:
-        db_dir = database
-    else:
-        db_dir = conf["database_dir"]
-    taai_params = ""
-    tapi_params = ""
-    tani_params = ""
+    db_dir = database or conf["database_dir"]
+
+    taai_parts, tapi_parts, tani_parts = [], [], []
+
     for k, v in kwargs.items():
+        if v is None:
+            continue
         if k.startswith("taai"):
-            taai_params += f" --{k} {v}"
+            taai_parts.append(f"--{k} {v}")
         elif k.startswith("tapi"):
-            tapi_params += f" --{k} {v}"
+            tapi_parts.append(f"--{k} {v}")
         elif k.startswith("tani"):
-            tani_params += f" --{k} {v}"
-    cmd = (
-        "snakemake --snakefile {snakefile} "
-        " --jobs {jobs} --rerun-incomplete "
-        " --configfile {configfile} "
-        " --scheduler greedy "
-        " --show-failed-logs "
-        " --groups group1=1 "
-        " --config database_dir='{db_dir}' sample='{input}' output_dir='{output}' api='{api_params}' aai='{aai_params}' ani='{ani_params}' batch='{batch}' nuc_search='{nuc_search}'"
-        " {args}"
-    ).format(
-        snakefile=get_snakefile("./pipeline/Snakefile"),
-        jobs=jobs,
-        configfile=CONFIG,
-        aai_params=taai_params,
-        api_params=tapi_params,
-        ani_params=tani_params,
-        nuc_search=kwargs.get('nuc_search'),
-        batch=batch,
-        db_dir=db_dir,
-        input=input,
-        output=output,
-        args=" ".join(snakemake_args),
-    )
+            tani_parts.append(f"--{k} {v}")
+
+    taai_params = " ".join(taai_parts)
+    tapi_params = " ".join(tapi_parts)
+    tani_params = " ".join(tani_parts)
+
+    # nuc_search: only pass if explicitly provided
+    nuc_search = kwargs.get("nuc_search", None)
+    if isinstance(nuc_search, bool):
+        nuc_search = str(nuc_search).lower()  # "true"/"false" plays nicer in configs
+
+    cmd_parts = [
+        "snakemake",
+        f"--snakefile {get_snakefile('./pipeline/contig_annotation')}",
+        f"--jobs {jobs}",
+        "--rerun-incomplete",
+        f"--configfile {CONFIG}",
+        "--scheduler greedy",
+        "--show-failed-logs",
+        "--groups group1=1",
+        "--config",
+        f"database_dir='{db_dir}'",
+        f"sample='{input}'",
+        f"output_dir='{output}'",
+        f"api='{tapi_params}'",
+        f"aai='{taai_params}'",
+        f"ani='{tani_params}'",
+        f"batch='{batch}'",
+    ]
+
+    if nuc_search is not None:
+        cmd_parts.append(f"nuc_search='{nuc_search}'")
+
+    if snakemake_args:
+        cmd_parts.extend(snakemake_args)
+
+    cmd = " ".join(cmd_parts)
+
     logger.info(cmd)
     logger.debug("Executing: %s" % cmd)
     try:
@@ -357,18 +370,28 @@ def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
     The Virus Contig Annotation Tool (vcat) is a straightforward, homology-based application designed to 
     provide taxonomy annotations to virus contigs and mapping reads directly to virus genomes.
 
-    usage
-    -----
+    usage: paired-end
+    -----------------
     vcat reads [OPTIONS] -i1 pair1.fastq -i2 pair2.fastq -o mapping_results.tsv
 
+    usage: single-end
+    -----------------
+    vcat reads [OPTIONS] -i1 pair1.fastq -o mapping_results.tsv
     """,
 )
 @click.option(
-    "-i",
+    "-in",
     "--input",
     type=click.Path(dir_okay=True, writable=True, resolve_path=True),
-    help="input read file/s to run vcat on",
+    help="input read file1 to run vcat on",
     required=True,
+)
+@click.option(
+    "-in2",
+    "--input2",
+    type=click.Path(dir_okay=True, writable=True, resolve_path=True),
+    help="input read file2 (paired-end) to run vcat on",
+    required=False,
 )
 @click.option(
     "-o",
@@ -386,6 +409,29 @@ def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
     help="use at most this many jobs in parallel (see cluster submission for more details).",
 )
 @click.option(
+    "--bbmap_args",
+    default="nodisk=t minid=0.95 maxindel=2 -Xmx20g",
+    help="Extra arguments passed directly to BBMap (e.g. 'minid=0.95 maxindel=3')",
+)
+@click.option(
+    "--pileup-args",
+    default=" qtrim=t trimq=10 border=5 secondary=f delcoverage=f minmapq=20",
+    help=(
+        "Extra arguments passed to pileup.sh / CoveragePileup "
+        "(e.g. 'minmapq=20 minbaseq=20 mincov=2 secondary=f delcov=f')"
+    ),
+)
+@click.option(
+    "--summary-args",
+    default=" -cp 0.5 -af 1 -mtr 100",
+    help=(
+        "coverage percentage = cp"
+        "Average fold = af"
+        "Min total reads = mtr"
+        "-cp 50.0 af 1 mtr 100"
+    ),
+)
+@click.option(
     "--profile",
     default=None,
     help="snakemake profile e.g. for cluster execution.",
@@ -399,7 +445,7 @@ def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
     help="Test execution.",
 )
 @click.argument("snakemake_args", nargs=-1, type=click.UNPROCESSED)
-def reads(input, output, jobs, profile, dryrun, snakemake_args):
+def reads(input, input2, output, jobs, profile, dryrun, bbmap_args, pileup_args, summary_args, snakemake_args):
     """
     Runs vcat pipeline on reads
 
@@ -411,25 +457,33 @@ def reads(input, output, jobs, profile, dryrun, snakemake_args):
     conf = load_configfile(CONFIG)
     db_dir = conf["database_dir"]
 
-    cmd = (
-        "snakemake --snakefile {snakefile} "
-        "--jobs {jobs} --rerun-incomplete "
-        " --configfile {configfile} "
-        "--scheduler greedy "
-        " --show-failed-logs "
-        " --groups group1=1 "
-        "--config database_dir='{db_dir}' sample='{input}' output_dir='{output}' {add_args} "
-        "{args}"
-    ).format(
-        snakefile=get_snakefile("./pipeline/Snakefile"),
-        jobs=jobs,
-        configfile=CONFIG,
-        db_dir=db_dir,
-        input=input,
-        output=output,
-        add_args="" if snakemake_args and snakemake_args[0].startswith("-") else "--",
-        args=" ".join(snakemake_args),
-    )
+    cmd = [
+        "snakemake",
+        f"--snakefile {get_snakefile('./pipeline/read_annotation')}",
+        f"--jobs {jobs}",
+        "--rerun-incomplete",
+        f"--configfile {CONFIG}",
+        "--scheduler greedy",
+        "--show-failed-logs",
+        "--groups group1=1",
+        f"--config database_dir='{db_dir}' sample='in={input}, in2={input2}' output_dir='{output}' bbmap_args='{bbmap_args}' pileup_args='{pileup_args}' summary_args='{summary_args}'",
+    ]
+
+    if dryrun:
+        cmd.append("--dry-run")
+
+    if profile:
+        cmd.append(f"--profile {profile}")
+
+    if snakemake_args:
+        if snakemake_args[0].startswith("-"):
+            cmd.extend(snakemake_args)
+        else:
+            cmd.append("--")
+            cmd.extend(snakemake_args)
+
+    cmd = " ".join(cmd)
+
     logger.debug("Executing: %s" % cmd)
     try:
         subprocess.check_call(cmd, shell=True)
@@ -463,22 +517,27 @@ def reads(input, output, jobs, profile, dryrun, snakemake_args):
 def preparedb(db_dir, jobs, snakemake_args):
     """Executes a snakemake workflow to downlod and building the databases"""
     logger.info("Building taxdb")
-    cmd = (
-        "snakemake --snakefile {snakefile} "
-        "--jobs {jobs} --rerun-incomplete "
-        " --configfile {configfile} "
-        "--scheduler greedy "
-        " --show-failed-logs "
-        "--config database_dir='{db_dir}' {add_args} "
-        "{args}"
-    ).format(
-        snakefile=get_snakefile("./pipeline/rules/taxdump.smk"),
-        jobs=jobs,
-        configfile=CONFIG,
-        db_dir=db_dir,
-        add_args="" if snakemake_args and snakemake_args[0].startswith("-") else "--",
-        args=" ".join(snakemake_args),
-    )
+    cmd_parts = [
+        "snakemake",
+        f"--snakefile {get_snakefile('./pipeline/rules/taxdump.smk')}",
+        f"--jobs {jobs}",
+        "--rerun-incomplete",
+        f"--configfile {CONFIG}",
+        "--scheduler greedy",
+        "--show-failed-logs",
+        "--config",
+        f"database_dir='{db_dir}'",
+    ]
+
+    if snakemake_args:
+        if snakemake_args[0].startswith("-"):
+            cmd_parts.extend(snakemake_args)
+        else:
+            cmd_parts.append("--")
+            cmd_parts.extend(snakemake_args)
+
+    cmd = " ".join(cmd_parts)
+
     try:
         subprocess.check_call(cmd, shell=True)
     except subprocess.CalledProcessError as e:
@@ -488,22 +547,27 @@ def preparedb(db_dir, jobs, snakemake_args):
 
     logger.info("Building mmseqs databases")
 
-    cmd = (
-        "snakemake --snakefile {snakefile} "
-        "--jobs {jobs} --rerun-incomplete "
-        " --configfile {configfile} "
-        "--scheduler greedy "
-        " --show-failed-logs "
-        "--config database_dir='{db_dir}' {add_args} "
-        "{args}"
-    ).format(
-        snakefile=get_snakefile("./pipeline/rules/createdb.smk"),
-        jobs=jobs,
-        configfile=CONFIG,
-        db_dir=db_dir,
-        add_args="" if snakemake_args and snakemake_args[0].startswith("-") else "--",
-        args=" ".join(snakemake_args),
-    )
+    cmd_parts = [
+        "snakemake",
+        f"--snakefile {get_snakefile('./pipeline/rules/createdb.smk')}",
+        f"--jobs {jobs}",
+        "--rerun-incomplete",
+        f"--configfile {CONFIG}",
+        "--scheduler greedy",
+        "--show-failed-logs",
+        "--config",
+        f"database_dir='{db_dir}'",
+    ]
+
+    if snakemake_args:
+        if snakemake_args[0].startswith("-"):
+            cmd_parts.extend(snakemake_args)
+        else:
+            cmd_parts.append("--")
+            cmd_parts.extend(snakemake_args)
+
+    cmd = " ".join(cmd_parts)
+
 
     try:
         subprocess.check_call(cmd, shell=True)
@@ -543,23 +607,28 @@ def downloaddb(db_dir, dbversion, snakemake_args):
     "pull pre-built databases from a remote server"
 
     logger.info(f"downloading {dbversion} database from remote server")
-    cmd = (
-        "snakemake --snakefile {snakefile} "
-        " --rerun-incomplete "
-        " --configfile {configfile} "
-        "--scheduler greedy "
-        " --show-failed-logs "
-        "--config database_dir='{db_dir}' dbversion='{dbversion}' dburl='{dburl}' {add_args} "
-        "{args}"
-    ).format(
-        snakefile=get_snakefile("./pipeline/rules/download.smk"),
-        configfile=CONFIG,
-        db_dir=db_dir,
-        dbversion=dbversion,
-        dburl=default_url,
-        add_args="" if snakemake_args and snakemake_args[0].startswith("-") else "--",
-        args=" ".join(snakemake_args),
-    )
+    cmd_parts = [
+        "snakemake",
+        f"--snakefile {get_snakefile('./pipeline/rules/download.smk')}",
+        "--rerun-incomplete",
+        f"--configfile {CONFIG}",
+        "--scheduler greedy",
+        "--show-failed-logs",
+        "--config",
+        f"database_dir='{db_dir}'",
+        f"dbversion='{dbversion}'",
+        f"dburl='{default_url}'",
+    ]
+
+    if snakemake_args:
+        if snakemake_args[0].startswith("-"):
+            cmd_parts.extend(snakemake_args)
+        else:
+            cmd_parts.append("--")
+            cmd_parts.extend(snakemake_args)
+
+    cmd = " ".join(cmd_parts)
+
     try:
         subprocess.check_call(cmd, shell=True)
     except subprocess.CalledProcessError as e:
@@ -1337,26 +1406,33 @@ def benchmark(dbdir, results, batch, level, snakemake_args, **kwargs):
         
 
     jobs = kwargs.get("jobs", 4)
-    cmd = (
-        "snakemake --snakefile {snakefile} "
-        " --jobs {jobs} --rerun-incomplete "
-        " --scheduler greedy "
-        " --show-failed-logs "
-        " --groups group1=1 "
-        " --config database_dir='{db_dir}' results='{results}' batch='{batch}' ani='{ani_params}' aai='{aai_params}' api='{api_params}' level='{level}'"
-        " {args}"
-    ).format(
-        snakefile=get_snakefile("./pipeline/rules/benchmark.smk"),
-        jobs=jobs,
-        batch=batch,
-        db_dir=dbdir,
-        results=results,
-        aai_params=taai_params,
-        api_params=tapi_params,
-        ani_params=tani_params,
-        level=level,
-        args=" ".join(snakemake_args),
-    )
+    cmd_parts = [
+        "snakemake",
+        f"--snakefile {get_snakefile('./pipeline/rules/benchmark.smk')}",
+        f"--jobs {jobs}",
+        "--rerun-incomplete",
+        "--scheduler greedy",
+        "--show-failed-logs",
+        "--groups group1=1",
+        "--config",
+        f"database_dir='{dbdir}'",
+        f"results='{results}'",
+        f"batch='{batch}'",
+        f"ani='{tani_params}'",
+        f"aai='{taai_params}'",
+        f"api='{tapi_params}'",
+        f"level='{level}'",
+    ]
+
+    if snakemake_args:
+        if snakemake_args[0].startswith("-"):
+            cmd_parts.extend(snakemake_args)
+        else:
+            cmd_parts.append("--")
+            cmd_parts.extend(snakemake_args)
+
+    cmd = " ".join(cmd_parts)
+
     logger.info(cmd)
     logger.debug("Executing: %s" % cmd)
     try:
