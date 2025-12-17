@@ -144,7 +144,7 @@ results can be found in the results directory within the ouput directory
 
 It takes ~4hrs to run vcat on the ICTV Taxonomy challenge dataset on a laptop computer.
 
-### running contig annotation pipeline
+### running read annotation pipeline
 
 ---
 
