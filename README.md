@@ -16,6 +16,10 @@ The Virus contig annotation tool (Vcat) is a straightforward, homology-based app
 
 ### Changelog
 ---
+<b>0.0.3</b>
+* VMR_40v2 is now available to download
+* added read annotation workflow 
+
 <b>0.0.2</b>
 * added downloaddb commad to download pre-built databases (VMR_40v1 and VMR_39v4)
 * added a definition file to build Apptainer containers
@@ -140,13 +144,18 @@ results can be found in the results directory within the ouput directory
 
 It takes ~4hrs to run vcat on the ICTV Taxonomy challenge dataset on a laptop computer.
 
+### running contig annotation pipeline
+
+---
+
+```
+vcat reads -in <reads1>.fastq [-in2 <reads2.fastq>] -o outdir
+```
+
 ---
 ### running other workflows
 ---
 ```
-# run vcat read annotation pipeline (comming soon)
-vcat reads -i1 <reads1>.fastq [-i2 <reads2.fastq>] -o outdir
-
 # calculate aai of query contigs to ICTV genomes
 vcat utils aai  [OPTIONS] -i contigs.m8 -g configs.gff -d [DBDIR]
 

@@ -1,6 +1,4 @@
-## Running Vcat
-
-### Contig annotation workflow : Quick start
+## Annotating contigs
 
 This workflow can be used to transfer taxonomic annotations to virus contigs. The workflow is written in 
 Snakemake. So, if you interupt it in the middle you can start again from where you left off. following command
@@ -96,7 +94,7 @@ outdir/
 ```{note}
 As a rough guideline, it takes around **4 hours** to run vcat on the ICTV Taxonomy challenge dataset on a typical laptop.
 ```
-### vcat output
+### Vcat output
 
 vcat reports the predicted taxonomic lineage for each query sequence in a structured results table. Each row corresponds to a single sequence and lists the assigned taxa across all ICTV hierarchical ranks, from realm down to species, whenever a match is detected.
 
@@ -130,19 +128,6 @@ AY780919,3095,1.0,ani,Riboviria,,,,Orthornavirae,,,,,,,,,,,,,,,,Birnaviridae,,,,
 DQ163914,43365,1.0,ani,Duplodnaviria,,,,Heunggongvirae,,,,Uroviricota,,,,Caudoviricetes,,,,,,,,Fredfastierviridae,,,,Jamesmcgillvirus,,,,Jamesmcgillvirus jv119X,
 CASDWV010000512,3611,1.0,ani,Riboviria,,,,Orthornavirae,,,,Lenarviricota,,,,Leviviricetes,,,,Norzivirales,,,,Solspiviridae,,,,Wulvevirus,,,,Wulvevirus geoadaptatum,
 ```
-
-
-### Read annotation workflow (coming soon)
-
-
-This workflow can be used to map reads to ICTV geomes. This might come in handy in instances where the virus abundance is
-extreamly low (clinical samples).
-
-```bash
-# run vcat read annotation pipeline (coming soon)
-vcat reads -i1 <reads1>.fastq [-i2 <reads2.fastq>] -o outdir
-```
-
 
 
 ### Utility workflows

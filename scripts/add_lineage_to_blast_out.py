@@ -12,7 +12,6 @@ this will be run after blast_genome rule
 import argparse
 import logging
 from pathlib import Path
-import shutil  # kept since you import it later
 import polars as pl
 import taxopy
 import re
@@ -36,13 +35,15 @@ def parse_args() -> argparse.Namespace:
         description="VCAT helper: load taxonomy DB and profile hits with configurable paths.",
     )
     p.add_argument(
-        "-d", "--database-dir",
+        "-d",
+        "--database-dir",
         type=Path,
         required=True,
         help="Root database directory (contains ictv-taxdump/ and VMR_latest/).",
     )
     p.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         type=Path,
         required=True,
         help="Input m8 file path.",
@@ -92,8 +93,8 @@ def main() -> None:
     # Resolve defaults that depend on database-dir
     database_dir: Path = args.database_dir.resolve()
     taxdump_dir: Path = (args.taxdump_dir or (database_dir / "ictv-taxdump")).resolve()
-    table_path : Path = args.input.resolve()
-    table_path_out : Path = table_path.with_suffix(table_path.suffix + ".tmp")
+    table_path: Path = args.input.resolve()
+    table_path_out: Path = table_path.with_suffix(table_path.suffix + ".tmp")
 
     # Basic validations
     for path, desc in [
@@ -121,22 +122,51 @@ def main() -> None:
     logger.info("Loaded TaxDb with %d nodes.", len(taxdb.taxid2parent))
 
     # Read table.m8
-    table = pl.read_csv(table_path,
-                           separator="\t",
-                           has_header=False,
-                           new_columns=DEFAULT_IN_HEADER.split(","))
-    logger.info("Loaded table.m8: %s rows.", f"{table.height:,}", 
-                )
-    taxid2name = {i:taxopy.Taxon(i, taxdb=taxdb) for i in table[args.taxid_col].to_list()}
+    table = pl.read_csv(
+        table_path,
+        separator="\t",
+        has_header=False,
+        new_columns=DEFAULT_IN_HEADER.split(","),
+    )
+    logger.info(
+        "Loaded table.m8: %s rows.",
+        f"{table.height:,}",
+    )
+    taxid2name = {
+        i: taxopy.Taxon(i, taxdb=taxdb) for i in table[args.taxid_col].to_list()
+    }
+
+    def get_name(x, taxid2name: dict = taxid2name) -> str:
+        if c := taxid2name.get(x, None):
+            return c.name
+        logging.warning("taxid2name.name returned None")
+        return "NA"
+
+    def search_pattern(x: str) -> str:
+        search = re.search(r"(?<=\|)(\S+)(?=\|)", x)
+        if search:
+            return search.group(1)
+
+        logging.warning("pattern search returned None")
+        return ""
+
     table = table.with_columns(
         pl.col("fident") / 100,
-        pl.col("target").map_elements(lambda x : re.search(r"(?<=\|)(\S+)(?=\|)", x).group(1), return_dtype=pl.String)
+        pl.col("target").map_elements(
+            lambda x: search_pattern(x),
+            return_dtype=pl.String,
+        ),
     )
     table = table.with_columns(
-        taxname = pl.col(args.taxid_col).map_elements(lambda x: taxid2name.get(x).name, return_dtype=pl.String),
-        taxlineage = pl.col(args.taxid_col).map_elements(lambda x: str(taxid2name.get(x)), return_dtype=pl.String)
+        taxname=pl.col(args.taxid_col).map_elements(
+            lambda x: get_name(x), return_dtype=pl.String
+        ),
+        taxlineage=pl.col(args.taxid_col).map_elements(
+            lambda x: str(taxid2name.get(x)), return_dtype=pl.String
+        ),
     )
     table.write_csv(table_path_out, separator="\t", include_header=False)
+
 
 if __name__ == "__main__":
     main()

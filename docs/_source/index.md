@@ -15,7 +15,8 @@ The **Virus contig annotation tool (Vcat)** is a simple, homology-based applicat
 :caption: Contents
 
 installation
-running-vcat
+running-vcat-contigs
+running-vcat-reads
 annotation-pipeline
 changelog
 extras-and-citation
