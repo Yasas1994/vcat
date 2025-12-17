@@ -205,7 +205,7 @@ rule annot_prof:
         mmseqs easy-search {input} {params.db} {output} {params.tmp} --threads {threads} -s 7 --split-memory-limit {resources.mem}\
         --format-output query,target,theader,fident,qlen,tlen,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,taxid,taxname,taxlineage &> {log}
         
-        correct_profile_taxinfo.py {params.db_root} {output} &>> {log}
+        correct_profile_taxinfo.py -d {params.db_root} -i {output} &>> {log}
         
         """
 
@@ -288,7 +288,7 @@ rule summarize:
 
     shell:
         """ 
-        
+
         postprocess.py {input.DBDIR} {input.NUC} {input.PROT} {input.PROF} {output} {params.ani} {params.aai} {params.api} &> {log}
         
         """

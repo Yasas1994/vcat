@@ -28,7 +28,7 @@ rule download_genbank:
         f"{DBDIR}/logs/download_genbank.log"
     shell:
         """
-        download_gb.py {input} {output} &> {log}
+        download_gb.py -i {input} -o {output} &> {log}
         """
 
 # preprocess and prepare .gb files to build mmseqs datasets
@@ -51,7 +51,7 @@ rule prepare:
         SEQDIR=f"{DBDIR}/VMR_latest",
     shell:
         """
-        prepare.py {input.DATADIR} {input.XLTABLE} {params.GBDIR} {params.SEQDIR} &> {log}
+        prepare.py -d {input.DATADIR} -x {input.XLTABLE} -g {params.GBDIR} -s {params.SEQDIR} &> {log}
         """
      
 rule make_mmseqs_proteindb:

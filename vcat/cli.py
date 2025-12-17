@@ -356,13 +356,9 @@ def contigs(input, output, database, jobs, batch, snakemake_args, **kwargs):
     The Virus contig annotation tool (Vcat) is a straightforward, homology-based application designed to 
     provide taxonomy annotations to virus contigs and mapping reads directly to virus genomes.
 
-    usage: paired-end
-    -----------------
-    vcat reads [OPTIONS] -i1 pair1.fastq -i2 pair2.fastq -o mapping_results.tsv
+    usage (paired-end): vcat reads [OPTIONS] -i1 pair1.fastq -i2 pair2.fastq -o mapping_results.tsv
 
-    usage: single-end
-    -----------------
-    vcat reads [OPTIONS] -i1 pair1.fastq -o mapping_results.tsv
+    usage (single-end): vcat reads [OPTIONS] -i1 pair1.fastq -o mapping_results.tsv
     """,
 )
 @click.option(
