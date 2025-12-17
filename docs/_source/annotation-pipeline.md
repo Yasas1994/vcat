@@ -1,6 +1,6 @@
-# Virus Contig Annotation Pipeline
+# Virus contig annotation pipeline
 
-`vcat` annotates viral contigs by sequentially comparing query sequences against nucleotide, protein, and profile databases using `mmseqs2`. The annotation process includes three stages.
+`Vcat` annotates viral contigs by sequentially comparing query sequences against nucleotide, protein, and profile databases using `mmseqs2`. The annotation process includes three stages.
 
 ```{image} _static/figures/vcat_workflow_light.svg
 :name: fig-vcat-workflow-light
@@ -16,7 +16,7 @@
 
 #### Nucleotide database comparison
 
-Query sequences are first compared to the nucleotide database using mmseqs_blastn. Optionally, users can switch to mmseqs_tblastx for higher sensitivity at the cost of longer run-times. vcat then tries to find the genome with the highest nucleotide similarity to the query seqeunce by approximating the ANIs between the query and genomes in the database. If the total ANI between the query and the targert is greater than 0.81, we assign the query to target's species. Target's genus is trnsfered to the query, if the ANI between them is between 0.49 and 0.81.
+Query sequences are first compared to the nucleotide database using mmseqs_blastn. Optionally, users can switch to mmseqs_tblastx for higher sensitivity at the cost of longer run-times. vcat then tries to find the genome with the highest nucleotide similarity to the query seqeunce by approximating the ANIs between the query and genomes in the database. If the total ANI between the query and the targert is greater than 0.81, we assign the query to target's species. Target's genus is trnsfered to the query, if the tANI between them is between 0.49 and 0.81.
 
 
 Here, **total ANI (tANI)** is defined as follows.
@@ -51,11 +51,11 @@ $$
 
 #### Protein database comparison
 
-For query sequences without significant nucleotide-level matches, open reading frames (ORFs) are predicted along the contig, and the resulting amino acid sequences are compared against the viral protein database. Based on these matches, we calculate the taxonomic average amino acid identity (taxo AAI) between the query contig and each candidate taxon, and assign the query to the taxon with the highest taxo AAI.
+For query sequences without significant nucleotide-level matches, open reading frames (ORFs) are predicted along the contig, and the resulting amino acid sequences are compared against the viral protein database. Based on these matches, we calculate the taxon Average Amino acid Identity (txAAI) between the query contig and each candidate taxon, and assign the query to the taxon with the highest txAAI.
 
-This taxo AAI is conceptually different from a “total AAI” between two genomes or sequences, where AAI is computed directly between a single query genome and a single target genome by averaging the identities of their shared orthologs. In contrast, taxo AAI aggregates information across all matched proteins belonging to a taxonomic group (e.g. genus or family), potentially originating from multiple genomes within that group. As a result, taxo AAI reflects the overall similarity of the query contig to an entire taxon, rather than to any single reference genome, and is therefore better suited for taxonomic assignment in the presence of incomplete, fragmented, or diverse reference data.
+This txAAI is conceptually different from a “total AAI” between two genomes or sequences, where AAI is computed directly between a single query genome and a single target genome by averaging the identities of their shared orthologs. In contrast, txAAI aggregates information across all matched proteins belonging to a taxonomic group (e.g. genus or family), potentially originating from multiple genomes within that group. As a result, txAAI reflects the overall similarity of the query contig to an entire taxon, rather than to any single reference genome, and is therefore better suited for taxonomic assignment in the presence of incomplete, fragmented, or diverse reference data.
 
-Here, **taxonomic AAI (txAAI)** is defined as follows.
+Here, **taxon AAI (txAAI)** is defined as follows.
 
 Extending the definitions above:
 
@@ -65,10 +65,10 @@ Extending the definitions above:
 - Let $ P_m \subseteq P_Q $ represent the subset of ORFs from $ Q $ that have significant matches in $ P_{db} $ to taxon $n$.  
 - $ I_{m_i} $ is the amino acid identity between the $ i $-th matched ORF in $ P_m $ and its corresponding hit in $ P_{db} $.
 
-Then the taxonomic average amino acid identity is:
+Then the txAAI is:
 
 $$
-\text{taxo AAI} =
+\text{txAAI} =
 \frac{1}{n} \sum_{i=1}^{n} I_{m_i}
 $$
 
@@ -88,7 +88,7 @@ $$
 
 Sequences that remain unannotated at the protein level are compared to a protein profile (HMM) database to provide taxonomic annotations.
 
-Here, **taxonomic API (txAPI)** is calculated similarly to taxo AAI, except the target database is a protein profile (HMM) database instead of a protein sequence database.
+Here, **taxon API (txAPI)** is calculated similarly to txAAI, except the target database is a protein profile (HMM) database instead of a protein sequence database.
 
 Let:
 
@@ -99,7 +99,7 @@ Let:
 Then:
 
 $$
-\text{taxo API} = \frac{1}{n} \sum_{i=1}^{n} S_{m_i}
+\text{txAPI} = \frac{1}{n} \sum_{i=1}^{n} S_{m_i}
 $$
 
 where

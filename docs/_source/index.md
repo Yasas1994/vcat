@@ -1,12 +1,12 @@
 <!-- ```{figure} ./_static/figures/vcat_logo.png
 ``` -->
 
-# virus contig annotation Tool
+# Virus contig annotation tool
 
-The **virus contig annotation tool (vcat)** is a simple, homology-based application designed to:
+The **Virus contig annotation tool (Vcat)** is a simple, homology-based application designed to:
 
 - provide taxonomic annotations for viral contigs  
-- map reads to virus contigs and support downstream analyses such as ANI/AAI calculations and visualizations.
+- map reads to virus contigs and support downstream analyses such as tANI/txAAI calculations and visualizations.
 
 
 
