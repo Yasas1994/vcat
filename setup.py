@@ -6,13 +6,13 @@ __email__ = "yasas.Wijesekara@uni-greifswald.de"
 __license__ = "BSD-3"
 
 # read the contents of your README file
-from os import path
+from os import path, listdir
 
 this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
-
+scripts = [path.join("scripts", i) for i in listdir(path.join(this_directory, "scripts")) if i.endswith(".py")]
 setup(
     name="vcat",
     version="0.0.3",
@@ -34,7 +34,5 @@ setup(
     # install via conda: click, pandas, pyyaml, snakemake
     entry_points={"console_scripts": ["vcat = vcat.cli:cli"]},
     classifiers=["Topic :: Scientific/Engineering :: Bio-Informatics"],
-    scripts=[
-        "scripts/*"
-    ],
+    scripts=scripts,
 )
