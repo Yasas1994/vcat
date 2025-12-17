@@ -16,19 +16,8 @@ taxid (taxid of the lca of the cluster)
 import pandas as pd
 import taxopy
 from sys import argv
-import logging
+from vcat.color_logger import logger
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,  # Set log level
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-    handlers=[
-        logging.StreamHandler()  # Print logs to the console
-    ],
-)
-
-# Create a logger instance
-logger = logging.getLogger("[vcat]")
 
 # You can also use your own set of taxonomy files:
 DATABASE_DIR = argv[1]
@@ -69,9 +58,9 @@ clustlca = clusters.groupby(["target", "root_p1"]).apply(
 
 clustlca = pd.DataFrame(clustlca).reset_index()
 clustlca.columns = ["target", "root_p1", "taxid"]
-
+logger.info("writing cluster to LCA mapping file")
 clustlca.to_csv(
     f"{DATABASE_DIR}/VMR_latest/mmseqs_pprofiles/mmseqs_pprofiles_lca.tsv",
-    index=None,
+    index=False,
     sep="\t",
 )

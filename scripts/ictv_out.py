@@ -1,83 +1,111 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
 
-formats vcat outputs to ictv taxonomy challange result format
+Formats VCAT outputs to the ICTV taxonomy challenge result format.
 """
 
+from pathlib import Path
+import click
 import pandas as pd
 import taxopy
-from sys import argv
-import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,  # Set log level
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-    handlers=[
-        logging.StreamHandler()  # Print logs to the console
-    ],
+from vcat.color_logger import logger
+
+
+@click.command(context_settings=dict(show_default=True))
+@click.option(
+    "-d",
+    "--database-dir",
+    type=click.Path(path_type=Path, exists=True, file_okay=False),
+    required=True,
+    help="Root database directory containing ictv-taxdump/.",
 )
-
-# Create a logger instance
-logger = logging.getLogger("[vcat]")
-
-DATABASE_DIR = argv[1]
-INFILE = argv[2]
-OUTFILE = argv[3]
-
-
-taxdb = taxopy.TaxDb(
-    nodes_dmp=f"{DATABASE_DIR}/ictv-taxdump/nodes.dmp",
-    names_dmp=f"{DATABASE_DIR}/ictv-taxdump/names.dmp",
-    merged_dmp=f"{DATABASE_DIR}/ictv-taxdump/merged.dmp",
+@click.option(
+    "-i",
+    "--input",
+    "infile",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="VCAT result input file.",
 )
+@click.option(
+    "-o",
+    "--output",
+    "outfile",
+    type=click.Path(path_type=Path, dir_okay=False),
+    required=True,
+    help="Output file in ICTV taxonomy challenge format.",
+)
+def main(database_dir: Path, infile: Path, outfile: Path) -> None:
+    database_dir = database_dir.resolve()
+    infile = infile.resolve()
+    outfile = outfile.resolve()
 
-results = pd.read_csv(INFILE)
+    # Load taxonomy database
+    taxdb = taxopy.TaxDb(
+        nodes_dmp=str(database_dir / "ictv-taxdump/nodes.dmp"),
+        names_dmp=str(database_dir / "ictv-taxdump/names.dmp"),
+        merged_dmp=str(database_dir / "ictv-taxdump/merged.dmp"),
+    )
 
-rows = []
-keys = [
-    "SequenceID",
-    "Realm (-viria)",
-    "Realm_score",
-    "Subrealm (-vira)",
-    "Subrealm_score",
-    "Kingdom (-virae)",
-    "Kingdom_score",
-    "Subkingdom (-virites)",
-    "Subkingdom_score",
-    "Phylum (-viricota)",
-    "Phylum_score",
-    "Subphylum (-viricotina)",
-    "Subphylum_score",
-    "Class (-viricetes)",
-    "Class_score",
-    "Subclass (-viricetidae)",
-    "Subclass_score",
-    "Order (-virales)",
-    "Order_score",
-    "Suborder (-virineae)",
-    "Suborder_score",
-    "Family (-viridae)",
-    "Family_score",
-    "Subfamily (-virinae)",
-    "Subfamily_score",
-    "Genus (-virus)",
-    "Genus_score",
-    "Subgenus (-virus)",
-    "Subgenus_score",
-    "Species (binomial)",
-    "Species_score",
-]
+    logger.info("Loaded ICTV taxonomy database")
 
-for row in results.iterrows():
-    t = dict.fromkeys(keys)
-    t["SequenceID"] = row[-1]["query"]
-    i = taxopy.Taxon(row[-1]["taxid"], taxdb=taxdb).rank_name_dictionary
-    for k, v in i.items():
-        for c in keys:
-            if c.startswith(f"{k.capitalize()} "):
-                t[c.capitalize()] = v
-    rows.append(t)
+    results = pd.read_csv(infile)
 
-pd.DataFrame(rows).to_csv(OUTFILE, index=None)
+    keys = [
+        "SequenceID",
+        "Realm (-viria)",
+        "Realm_score",
+        "Subrealm (-vira)",
+        "Subrealm_score",
+        "Kingdom (-virae)",
+        "Kingdom_score",
+        "Subkingdom (-virites)",
+        "Subkingdom_score",
+        "Phylum (-viricota)",
+        "Phylum_score",
+        "Subphylum (-viricotina)",
+        "Subphylum_score",
+        "Class (-viricetes)",
+        "Class_score",
+        "Subclass (-viricetidae)",
+        "Subclass_score",
+        "Order (-virales)",
+        "Order_score",
+        "Suborder (-virineae)",
+        "Suborder_score",
+        "Family (-viridae)",
+        "Family_score",
+        "Subfamily (-virinae)",
+        "Subfamily_score",
+        "Genus (-virus)",
+        "Genus_score",
+        "Subgenus (-virus)",
+        "Subgenus_score",
+        "Species (binomial)",
+        "Species_score",
+    ]
+
+    rows = []
+
+    for _, row in results.iterrows():
+        out_row = dict.fromkeys(keys)
+        out_row["SequenceID"] = row["query"]
+
+        taxon = taxopy.Taxon(row["taxid"], taxdb=taxdb)
+        rank_map = taxon.rank_name_dictionary
+
+        for rank, name in rank_map.items():
+            for col in keys:
+                if col.startswith(f"{rank.capitalize()} "):
+                    out_row[col] = name
+
+        rows.append(out_row)
+
+    logger.info("Writing ICTV formatted output file: %s", outfile)
+    pd.DataFrame(rows).to_csv(outfile, index=False)
+
+
+if __name__ == "__main__":
+    main()

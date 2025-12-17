@@ -1,98 +1,118 @@
-#!/usr/bin/env python
-
+#!/usr/bin/env python3
 """
 author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
 
-parses the ICTV datasheet and grabs the genomes of viruses directly
-from NCBI in gb format
-
+Parses the ICTV datasheet and downloads virus genomes directly
+from NCBI in GenBank (gb) format.
 """
 
-import openpyxl
 from pathlib import Path
-from sys import argv
 import re
 import requests
+import openpyxl
+import click
+
 from vcat.color_logger import logger
-import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,  # Set log level
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-    handlers=[
-        logging.StreamHandler()  # Print logs to the console
-    ],
+
+NCBI_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+NCBI_LINK_PATTERN = r"https://www\.ncbi\.nlm\.nih\.gov/nuccore/.+"
+
+
+@click.command(context_settings=dict(show_default=True))
+@click.option(
+    "-i",
+    "--input",
+    "infile",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="ICTV VMR Excel file (.xlsx).",
 )
+@click.option(
+    "-o",
+    "--outdir",
+    type=click.Path(path_type=Path, file_okay=False),
+    required=True,
+    help="Output directory to store downloaded GenBank files.",
+)
+@click.option(
+    "--batch-size",
+    default=200,
+    type=int,
+    help="Number of accessions per NCBI request.",
+)
+def main(infile: Path, outdir: Path, batch_size: int) -> None:
+    outdir = outdir.resolve()
+    outdir.mkdir(parents=True, exist_ok=True)
 
-# Create a logger instance
-logger = logging.getLogger("[vcat]")
+    logger.info("Loading VMR metadata: %s", infile)
 
-infile = argv[1]
-outdir = argv[2]
+    wb = openpyxl.load_workbook(infile)
+    sheets = wb.sheetnames
+    ws = wb[sheets[1]]
 
+    headers = [cell.value for cell in ws[1]]
 
-# Regular expression pattern
-pattern = r"https://www\.ncbi\.nlm\.nih\.gov/nuccore/.+"
-DBDIR = outdir
-directory = Path(outdir)
-# Create the directory if it doesn't exist
-directory.mkdir(parents=True, exist_ok=True)
+    dlink = "Accessions Link"
+    virus_names = "Virus name(s)"
 
+    all_ids: list[str] = []
 
-# NCBI EFetch API URL for FASTA format
-base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    id_list_path = outdir / "ID.list"
+    with open(id_list_path, "w") as fh:
+        for row in range(2, ws.max_row + 1):
+            names = ws.cell(row=row, column=headers.index(virus_names) + 1)
+            name_val = "" if names.value is None else str(names.value)
 
-wb = openpyxl.load_workbook(infile)
-sheets = wb.sheetnames
-ws = wb[sheets[1]]
-headers = [cell.value for cell in ws[1]]
+            # skip gene transfer agents
+            if "gene transfer agent" in name_val.lower():
+                continue
 
-dlink = "Accessions Link"
-virus_names = "Virus name(s)"
-num_links = 0
-all_ids = []
-with open(f"{DBDIR}/ID.list", "w") as fh:
-    # Iterate through the cells in the last column
-    for row in range(2, ws.max_row + 1):  # Iterate through all rows
-        names = ws.cell(row=row, column=headers.index(virus_names) + 1)
-        tmp = "" if None is names.value else names.value
-        if "gene transfer agent" not in tmp:
             cell = ws.cell(row=row, column=headers.index(dlink) + 1)
-            if cell.value:
-                link = cell.value.split('"')[1]
-                match = re.search(pattern, link)
-                if match:
-                    num_links += 1
+            if not cell.value:
+                continue
 
-                    # Extract sequence IDs from the URL
-                    ids = link.split("/")[-1]
-                    fh.write(ids + "\n")
-                    all_ids.extend(ids.split("(")[0].split(","))
+            # Extract URL inside quotes
+            try:
+                link = name_val.split('"')[1]
+            except IndexError:
+                continue
+
+            if not re.search(NCBI_LINK_PATTERN, link):
+                continue
+
+            ids = link.split("/")[-1]
+            fh.write(ids + "\n")
+            all_ids.extend(ids.split("(")[0].split(","))
+
+    logger.info("Found %d accessions. Downloading from NCBI…", len(all_ids))
+
+    for i in range(0, len(all_ids), batch_size):
+        params = {
+            "db": "nuccore",
+            "id": ",".join(all_ids[i : i + batch_size]),
+            "rettype": "gb",
+            "retmode": "text",
+        }
+
+        response = requests.get(NCBI_EFETCH_URL, params=params)
+
+        if response.status_code == 200:
+            outfile = outdir / f"sequences_{i}_{i + batch_size}.gb"
+            outfile.write_text(response.text)
+            logger.info("Downloaded: %s", outfile.name)
+        else:
+            logger.error(
+                "Failed batch %d–%d (HTTP %d)",
+                i,
+                i + batch_size,
+                response.status_code,
+            )
+
+    # Sentinel file for downstream workflows
+    (outdir / "download_complete").touch()
+    logger.info("Download complete.")
 
 
-for i in range(0, len(all_ids), 200):
-    # API parameters
-    params = {
-        "db": "nuccore",  # Nucleotide database
-        "id": ",".join(all_ids[i : i + 200]),  # Sequence IDs
-        "rettype": "gb",  # Return type
-        "retmode": "text",  # Return mode
-    }
-
-    # Send the request
-    response = requests.get(base_url, params=params)
-
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Save the FASTA data to a file
-        with open(f"{DBDIR}/sequences_{i}_{i+200}.gb", "w") as file:
-            file.write(response.text)
-        logger.info(f"FASTA file downloaded successfully as sequences_{i}_{i+200}.gb")
-    else:
-        logger.info(
-            f"Failed to retrieve data. HTTP Status Code: {response.status_code}"
-        )
-
-
-open(f"{DBDIR}/download_complete", "w").close()
+if __name__ == "__main__":
+    main()

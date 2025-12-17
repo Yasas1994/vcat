@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+"""
+author: Yasas Wijesekara (yasas.wijesekara@uni-greifswald.de)
+
+filters and formats the pileup output
+"""
 import polars as pl
-import numpy as np
 import click
 from taxopy.core import TaxDb
 from taxopy import Taxon
@@ -59,6 +63,7 @@ def get_acc2taxid_map(i:str) -> dict:
 )
 def main(input, dbdir, cp, af, mtr, output):
     """Filter and summarize pileup.sh output."""
+    logger.info("summarizing pileup output")
     acc2taxid = get_acc2taxid_map(f"{dbdir}/VMR_latest/virus_genome.accession2taxid")
 
     taxdb = TaxDb(

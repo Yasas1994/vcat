@@ -1,17 +1,39 @@
-#!/usr/bin/env python
-from Bio import SeqIO
-from sys import argv
+#!/usr/bin/env python3
 from pathlib import Path
 
-path = Path(argv[1])
-seq_records = []
-for current_seq in SeqIO.parse(path, "fasta"):
-    if len(current_seq.seq) != 0:
-        seq_records.append(current_seq)
+import click
+from Bio import SeqIO
 
-# Write the genome sequences to a file
 
-new_path = path.parent / (path.name + ".tmp")
+@click.command(context_settings=dict(show_default=True))
+@click.option(
+    "-i",
+    "--input",
+    "path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Input FASTA file.",
+)
+@click.option(
+    "-o",
+    "--output",
+    "outpath",
+    type=click.Path(path_type=Path, dir_okay=False),
+    default=None,
+    help="Output FASTA file (default: <input>.tmp).",
+)
+def main(path: Path, outpath: Path | None) -> None:
+    """Remove empty sequences from a FASTA file."""
+    seq_records = [rec for rec in SeqIO.parse(path, "fasta") if len(rec.seq) > 0]
 
-with open(new_path, "w") as output_handle:
-    SeqIO.write(seq_records, output_handle, "fasta")
+    if outpath is None:
+        outpath = path.parent / f"{path.name}.tmp"
+
+    with open(outpath, "w") as handle:
+        SeqIO.write(seq_records, handle, "fasta")
+
+    click.echo(f"Wrote {len(seq_records)} sequences to {outpath}")
+
+
+if __name__ == "__main__":
+    main()
